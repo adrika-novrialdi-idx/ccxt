@@ -92,6 +92,317 @@
                     "networks": {}
                 }
             }
+        ],
+        "fetchBalance": [
+            {
+                "description": "TAPI v2 account balances",
+                "method": "fetchBalance",
+                "input": [],
+                "options": {
+                    "tapiVersion": "2"
+                },
+                "httpResponse": {
+                    "canTrade": true,
+                    "balances": [
+                        {
+                            "asset": "BTC",
+                            "free": "0.1",
+                            "locked": "0.01"
+                        }
+                    ]
+                },
+                "parsedResponse": {
+                    "info": {
+                        "canTrade": true,
+                        "balances": [
+                            {
+                                "asset": "BTC",
+                                "free": "0.1",
+                                "locked": "0.01"
+                            }
+                        ]
+                    },
+                    "BTC": {
+                        "free": 0.1,
+                        "used": 0.01,
+                        "total": 0.11
+                    },
+                    "free": {
+                        "BTC": 0.1
+                    },
+                    "used": {
+                        "BTC": 0.01
+                    },
+                    "total": {
+                        "BTC": 0.11
+                    }
+                }
+            }
+        ],
+        "createOrder": [
+            {
+                "description": "TAPI v2 limit order has no status",
+                "method": "createOrder",
+                "input": [
+                    "BTC/IDR",
+                    "limit",
+                    "buy",
+                    0.01,
+                    1000000
+                ],
+                "options": {
+                    "tapiVersion": "2"
+                },
+                "httpResponse": {
+                    "symbol": "BTCIDR",
+                    "orderId": 6423,
+                    "clientOrderId": "btcidr-buy-1",
+                    "side": "BUY",
+                    "type": "LIMIT",
+                    "price": "1000000",
+                    "origQty": "0.01",
+                    "executedQty": "0",
+                    "fullOrderId": "btcidr-limit-6423"
+                },
+                "parsedResponse": {
+                    "info": {
+                        "symbol": "BTCIDR",
+                        "orderId": 6423,
+                        "clientOrderId": "btcidr-buy-1",
+                        "side": "BUY",
+                        "type": "LIMIT",
+                        "price": "1000000",
+                        "origQty": "0.01",
+                        "executedQty": "0",
+                        "fullOrderId": "btcidr-limit-6423"
+                    },
+                    "id": "btcidr-limit-6423",
+                    "clientOrderId": "btcidr-buy-1",
+                    "timestamp": null,
+                    "datetime": null,
+                    "lastTradeTimestamp": null,
+                    "symbol": "BTC/IDR",
+                    "type": "limit",
+                    "timeInForce": null,
+                    "postOnly": null,
+                    "side": "buy",
+                    "price": 1000000,
+                    "triggerPrice": null,
+                    "cost": null,
+                    "average": null,
+                    "amount": 0.01,
+                    "filled": 0,
+                    "remaining": 0.01,
+                    "status": null,
+                    "fee": null,
+                    "trades": [],
+                    "fees": [],
+                    "lastUpdateTimestamp": null,
+                    "reduceOnly": null,
+                    "stopPrice": null,
+                    "takeProfitPrice": null,
+                    "stopLossPrice": null
+                }
+            }
+        ],
+        "fetchOrders": [
+            {
+                "description": "TAPI v2 order history uses oriQty",
+                "method": "fetchOrders",
+                "input": [
+                    "BTC/IDR"
+                ],
+                "options": {
+                    "tapiVersion": "2"
+                },
+                "httpResponse": {
+                    "data": [
+                        {
+                            "orderId": "btcidr-limit-3568",
+                            "clientOrderId": "abc",
+                            "symbol": "btcidr",
+                            "side": "BUY",
+                            "type": "LIMIT",
+                            "status": "FILLED",
+                            "price": "1000000",
+                            "oriQty": "0.01",
+                            "executedQty": "0.01",
+                            "submitTime": 1609459200000,
+                            "finishTime": 1609459300000
+                        }
+                    ]
+                },
+                "parsedResponse": [
+                    {
+                        "info": {
+                            "orderId": "btcidr-limit-3568",
+                            "clientOrderId": "abc",
+                            "symbol": "btcidr",
+                            "side": "BUY",
+                            "type": "LIMIT",
+                            "status": "FILLED",
+                            "price": "1000000",
+                            "oriQty": "0.01",
+                            "executedQty": "0.01",
+                            "submitTime": 1609459200000,
+                            "finishTime": 1609459300000
+                        },
+                        "id": "btcidr-limit-3568",
+                        "clientOrderId": "abc",
+                        "timestamp": 1609459200000,
+                        "datetime": "2021-01-01T00:00:00.000Z",
+                        "lastTradeTimestamp": 1609459300000,
+                        "symbol": "BTC/IDR",
+                        "type": "limit",
+                        "timeInForce": null,
+                        "postOnly": null,
+                        "side": "buy",
+                        "price": 1000000,
+                        "triggerPrice": null,
+                        "cost": null,
+                        "average": null,
+                        "amount": 0.01,
+                        "filled": 0.01,
+                        "remaining": 0,
+                        "status": "closed",
+                        "fee": null,
+                        "trades": [],
+                        "fees": [],
+                        "lastUpdateTimestamp": null,
+                        "reduceOnly": null,
+                        "stopPrice": null,
+                        "takeProfitPrice": null,
+                        "stopLossPrice": null
+                    }
+                ]
+            }
+        ],
+        "fetchMyTrades": [
+            {
+                "description": "TAPI v2 trade history",
+                "method": "fetchMyTrades",
+                "input": [
+                    "BTC/IDR"
+                ],
+                "options": {
+                    "tapiVersion": "2"
+                },
+                "httpResponse": {
+                    "data": [
+                        {
+                            "tradeId": "trade1",
+                            "orderId": "btcidr-limit-3568",
+                            "symbol": "BTCIDR",
+                            "price": "1000000",
+                            "qty": "0.01",
+                            "quoteQty": "10000",
+                            "commission": "30",
+                            "commissionAsset": "IDR",
+                            "isBuyer": true,
+                            "isMaker": false,
+                            "time": 1609459200000
+                        }
+                    ]
+                },
+                "parsedResponse": [
+                    {
+                        "id": "trade1",
+                        "info": {
+                            "tradeId": "trade1",
+                            "orderId": "btcidr-limit-3568",
+                            "symbol": "BTCIDR",
+                            "price": "1000000",
+                            "qty": "0.01",
+                            "quoteQty": "10000",
+                            "commission": "30",
+                            "commissionAsset": "IDR",
+                            "isBuyer": true,
+                            "isMaker": false,
+                            "time": 1609459200000
+                        },
+                        "timestamp": 1609459200000,
+                        "datetime": "2021-01-01T00:00:00.000Z",
+                        "symbol": "BTC/IDR",
+                        "type": null,
+                        "side": "buy",
+                        "order": "btcidr-limit-3568",
+                        "takerOrMaker": "taker",
+                        "price": 1000000,
+                        "amount": 0.01,
+                        "cost": 10000,
+                        "fee": {
+                            "currency": "IDR",
+                            "cost": 30
+                        },
+                        "fees": [
+                            {
+                                "currency": "IDR",
+                                "cost": 30
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "fetchDeposits": [
+            {
+                "description": "TAPI v2 crypto deposit uses depositStatus",
+                "method": "fetchDeposits",
+                "input": [
+                    "BTC"
+                ],
+                "options": {
+                    "tapiVersion": "2"
+                },
+                "httpResponse": [
+                    {
+                        "id": "d1",
+                        "amount": "10",
+                        "coin": "BTC",
+                        "txId": "tx1",
+                        "address": "addr1",
+                        "network": "erc20",
+                        "depositStatus": "success",
+                        "insertTime": "2024-01-02 15:04:05",
+                        "completeTime": "2024-01-02 16:04:05"
+                    }
+                ],
+                "parsedResponse": [
+                    {
+                        "id": "d1",
+                        "txid": "tx1",
+                        "timestamp": 1704207845000,
+                        "datetime": "2024-01-02T15:04:05.000Z",
+                        "network": "erc20",
+                        "addressFrom": null,
+                        "address": "addr1",
+                        "addressTo": null,
+                        "amount": 10,
+                        "type": "deposit",
+                        "currency": "BTC",
+                        "status": "ok",
+                        "updated": 1704211445000,
+                        "tagFrom": null,
+                        "tag": null,
+                        "tagTo": null,
+                        "comment": null,
+                        "internal": null,
+                        "fee": null,
+                        "info": {
+                            "id": "d1",
+                            "amount": "10",
+                            "coin": "BTC",
+                            "txId": "tx1",
+                            "address": "addr1",
+                            "network": "erc20",
+                            "depositStatus": "success",
+                            "insertTime": "2024-01-02 15:04:05",
+                            "completeTime": "2024-01-02 16:04:05",
+                            "txType": "deposit"
+                        }
+                    }
+                ]
+            }
         ]
     }
 }
