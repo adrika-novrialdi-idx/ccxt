@@ -258,6 +258,7 @@ export default class indodax extends Exchange {
             // exchange-specific options
             'options': {
                 'tapiVersion': '1', // '2' opts private calls into TAPI v2; a v1 key cannot call v2
+                'sandboxUrl': undefined, // optional v2 base host with no trailing path; unset keeps urls.api.v2
                 'recvWindow': 5 * 1000, // default 5 sec
                 'timeDifference': 0, // the difference between system clock and exchange clock
                 'adjustForTimeDifference': false, // controls the adjustment logic upon instantiation
@@ -2550,6 +2551,19 @@ export default class indodax extends Exchange {
         return this.parseV2Transaction (response, currency);
     }
 
+    /**
+     * @ignore
+     * @method
+     * @name indodax#sign
+     * @description sign an api request; when options.sandboxUrl is set, v2 requests use that base host with no trailing path
+     * @param {string} path endpoint path
+     * @param {string} [api] api section, public, private, or v2
+     * @param {string} [method] http method
+     * @param {object} [params] request parameters
+     * @param {object} [headers] request headers
+     * @param {string} [body] request body
+     * @returns {object} a signed request with url, method, body, and headers
+     */
     override sign (path: any, api = 'public', method = 'GET', params: Dict = {}, headers: NullableDict = undefined, body: Str = undefined): Dict {
         let url = this.urls['api'][api];
         if (api === 'public') {
@@ -2561,6 +2575,10 @@ export default class indodax extends Exchange {
             }
         } else if (api === 'v2') {
             this.checkRequiredCredentials ();
+            const sandboxUrl = this.safeString (this.options, 'sandboxUrl');
+            if ((sandboxUrl !== undefined) && (sandboxUrl !== '')) {
+                url = sandboxUrl;
+            }
             url = url + '/api/v2/' + this.implodeParams (path, params);
             const query = this.urlencode (this.extend ({
                 'timestamp': this.nonce (),
