@@ -50,7 +50,7 @@ public partial class indodax : Exchange
                 { "fetchDepositAddress", "emulated" },
                 { "fetchDepositAddresses", true },
                 { "fetchDepositAddressesByNetwork", false },
-                { "fetchDeposits", false },
+                { "fetchDeposits", true },
                 { "fetchDepositsWithdrawals", true },
                 { "fetchDepositWithdrawFee", true },
                 { "fetchDepositWithdrawFees", false },
@@ -81,6 +81,7 @@ public partial class indodax : Exchange
                 { "fetchMarkPrices", false },
                 { "fetchMyLiquidations", false },
                 { "fetchMySettlementHistory", false },
+                { "fetchMyTrades", true },
                 { "fetchOHLCV", true },
                 { "fetchOpenInterest", false },
                 { "fetchOpenInterestHistory", false },
@@ -90,7 +91,7 @@ public partial class indodax : Exchange
                 { "fetchOptionChain", false },
                 { "fetchOrder", true },
                 { "fetchOrderBook", true },
-                { "fetchOrders", false },
+                { "fetchOrders", true },
                 { "fetchPosition", false },
                 { "fetchPositionForSymbolWs", false },
                 { "fetchPositionHistory", false },
@@ -116,7 +117,7 @@ public partial class indodax : Exchange
                 { "fetchUnderlyingAssets", false },
                 { "fetchVolatilityHistory", false },
                 { "fetchWithdrawal", false },
-                { "fetchWithdrawals", false },
+                { "fetchWithdrawals", true },
                 { "reduceMargin", false },
                 { "repayCrossMargin", false },
                 { "repayIsolatedMargin", false },
@@ -133,6 +134,7 @@ public partial class indodax : Exchange
                 { "api", new Dictionary<string, object>() {
                     { "public", "https://indodax.com" },
                     { "private", "https://indodax.com/tapi" },
+                    { "v2", "https://api.indodax.com" },
                 } },
                 { "www", "https://www.indodax.com" },
                 { "doc", "https://github.com/btcid/indodax-official-api-docs" },
@@ -219,6 +221,53 @@ public partial class indodax : Exchange
                         } },
                     } },
                 } },
+                { "v2", new Dictionary<string, object>() {
+                    { "get", new Dictionary<string, object>() {
+                        { "order", new Dictionary<string, object>() {
+                            { "cost", 4 },
+                        } },
+                        { "openOrders", new Dictionary<string, object>() {
+                            { "cost", 4 },
+                        } },
+                        { "order/histories", new Dictionary<string, object>() {
+                            { "cost", 4 },
+                        } },
+                        { "myTrades", new Dictionary<string, object>() {
+                            { "cost", 4 },
+                        } },
+                        { "account", new Dictionary<string, object>() {
+                            { "cost", 4 },
+                        } },
+                        { "capital/withdraw/history", new Dictionary<string, object>() {
+                            { "cost", 24 },
+                        } },
+                        { "capital/deposit/hisrec", new Dictionary<string, object>() {
+                            { "cost", 24 },
+                        } },
+                        { "capital/deposit/address/list", new Dictionary<string, object>() {
+                            { "cost", 24 },
+                        } },
+                        { "fiat/orders", new Dictionary<string, object>() {
+                            { "cost", 24 },
+                        } },
+                    } },
+                    { "post", new Dictionary<string, object>() {
+                        { "order", new Dictionary<string, object>() {
+                            { "cost", 4 },
+                        } },
+                        { "capital/withdraw/apply", new Dictionary<string, object>() {
+                            { "cost", 24 },
+                        } },
+                        { "fiat/withdraw", new Dictionary<string, object>() {
+                            { "cost", 24 },
+                        } },
+                    } },
+                    { "delete", new Dictionary<string, object>() {
+                        { "order", new Dictionary<string, object>() {
+                            { "cost", 4 },
+                        } },
+                    } },
+                } },
             } },
             { "fees", new Dictionary<string, object>() {
                 { "trading", new Dictionary<string, object>() {
@@ -235,6 +284,24 @@ public partial class indodax : Exchange
                     { "invalid order.", typeof(OrderNotFound) },
                     { "Invalid credentials. API not found or session has expired.", typeof(AuthenticationError) },
                     { "Invalid credentials. Bad sign.", typeof(AuthenticationError) },
+                    { "-1121", typeof(BadSymbol) },
+                    { "-2013", typeof(OrderNotFound) },
+                    { "-1021", typeof(InvalidNonce) },
+                    { "-1022", typeof(AuthenticationError) },
+                    { "-1002", typeof(AuthenticationError) },
+                    { "-2014", typeof(AuthenticationError) },
+                    { "-2015", typeof(AuthenticationError) },
+                    { "-1003", typeof(RateLimitExceeded) },
+                    { "-2010", typeof(InvalidOrder) },
+                    { "-4026", typeof(InsufficientFunds) },
+                    { "-1102", typeof(ArgumentsRequired) },
+                    { "-1130", typeof(InvalidOrder) },
+                    { "-1111", typeof(InvalidOrder) },
+                    { "-4022", typeof(InvalidOrder) },
+                    { "-4023", typeof(InvalidOrder) },
+                    { "-4033", typeof(InvalidAddress) },
+                    { "-4035", typeof(InvalidAddress) },
+                    { "-4019", typeof(InvalidOrder) },
                 } },
                 { "broad", new Dictionary<string, object>() {
                     { "Minimum price", typeof(InvalidOrder) },
@@ -252,6 +319,8 @@ public partial class indodax : Exchange
                 { "1w", "1W" },
             } },
             { "options", new Dictionary<string, object>() {
+                { "tapiVersion", "1" },
+                { "sandboxUrl", null },
                 { "recvWindow", multiply(5, 1000) },
                 { "timeDifference", 0 },
                 { "adjustForTimeDifference", false },
@@ -288,7 +357,13 @@ public partial class indodax : Exchange
                         { "iceberg", false },
                     } },
                     { "createOrders", null },
-                    { "fetchMyTrades", null },
+                    { "fetchMyTrades", new Dictionary<string, object>() {
+                        { "marginMode", false },
+                        { "daysBack", 7 },
+                        { "limit", 1000 },
+                        { "untilDays", 7 },
+                        { "symbolRequired", true },
+                    } },
                     { "fetchOrder", new Dictionary<string, object>() {
                         { "marginMode", false },
                         { "trigger", false },
@@ -302,7 +377,15 @@ public partial class indodax : Exchange
                         { "trailing", false },
                         { "symbolRequired", false },
                     } },
-                    { "fetchOrders", null },
+                    { "fetchOrders", new Dictionary<string, object>() {
+                        { "marginMode", false },
+                        { "limit", 1000 },
+                        { "daysBack", 7 },
+                        { "untilDays", 7 },
+                        { "trigger", false },
+                        { "trailing", false },
+                        { "symbolRequired", true },
+                    } },
                     { "fetchClosedOrders", new Dictionary<string, object>() {
                         { "marginMode", false },
                         { "limit", 1000 },
@@ -340,6 +423,33 @@ public partial class indodax : Exchange
     public override Int64 nonce()
     {
         return ((Int64)((object)(subtract(this.milliseconds(), (this.options.ContainsKey("timeDifference") ? this.options["timeDifference"] : null))))!);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#isTapiV2
+     * @description whether private calls should use TAPI v2
+     * @returns {boolean} true when options.tapiVersion is "2"
+     */
+    public virtual bool isTapiV2()
+    {
+        return ((bool)((object)((this.safeString(this.options, "tapiVersion", "1") == "2")))!);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#tapiV2Symbol
+     * @description convert a market to the lowercase TAPI v2 symbol
+     * @param {object} market market structure
+     * @returns {string} exchange symbol such as btcidr
+     */
+    public virtual object tapiV2Symbol(object market)
+    {
+        string? marketId = this.safeString(market, "id", "");
+        marketId = ((string)marketId).Replace((string)"_", (string)"");
+        return ((string)marketId).ToLower();
     }
 
     /**
@@ -501,12 +611,18 @@ public partial class indodax : Exchange
      * @name indodax#fetchBalance
      * @description query for balance and get the amount of funds available for trading or funds locked in orders
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#get-info-endpoint
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-account-information
      * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {boolean} [params.omitZeroBalances] true to omit zero balances, only used when options.tapiVersion is "2"
      * @returns {object} a [balance structure]{@link https://docs.ccxt.com/?id=balance-structure}
      */
     public async override Task<ccxt.Balances> FetchBalance(object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            return ccxt.BaseExchange.ToBalances(await this.balanceV2(parameters));
+        }
         if ((this.markets == null))
         {
             await this.loadMarkets();
@@ -702,6 +818,10 @@ public partial class indodax : Exchange
 
     public override Dictionary<string, object> parseTrade(object trade, object market = null)
     {
+        if ((trade != null && ((IDictionary<string, object>)trade).ContainsKey("tradeId")))
+        {
+            return ((Dictionary<string, object>)((object)(this.parseV2Trade(trade, market))));
+        }
         Int64? timestamp = this.safeTimestamp(trade, "date");
         return this.safeTrade(new Dictionary<string, object>() {
             { "id", this.safeString(trade, "tid") },
@@ -827,12 +947,23 @@ public partial class indodax : Exchange
             { "open", "open" },
             { "filled", "closed" },
             { "cancelled", "canceled" },
+            { "NEW", "open" },
+            { "PARTIALLY_FILLED", "open" },
+            { "FILLED", "closed" },
+            { "CANCELLED", "canceled" },
+            { "CANCELED", "canceled" },
+            { "REJECTED", "rejected" },
+            { "EXPIRED", "expired" },
         };
         return this.safeString(statuses, ((string)status), status);
     }
 
     public override Dictionary<string, object> parseOrder(object order, object market = null)
     {
+        if (((order != null && ((IDictionary<string, object>)order).ContainsKey("origQty"))) || ((order != null && ((IDictionary<string, object>)order).ContainsKey("oriQty"))) || ((order != null && ((IDictionary<string, object>)order).ContainsKey("fullOrderId"))) || ((order != null && ((IDictionary<string, object>)order).ContainsKey("executedQty"))))
+        {
+            return ((Dictionary<string, object>)((object)(this.parseV2Order(order, market))));
+        }
         //
         //     {
         //         "order_id": "12345",
@@ -941,14 +1072,20 @@ public partial class indodax : Exchange
      * @name indodax#fetchOrder
      * @description fetches information on an order made by the user
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#get-order-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-order
      * @param {string} id order id
      * @param {string} symbol unified symbol of the market the order was made in
      * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
      * @returns {object} An [order structure]{@link https://docs.ccxt.com/?id=order-structure}
      */
     public async override Task<ccxt.Order> FetchOrder(string id, string symbol = null, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            return ccxt.BaseExchange.ToOrder(await this.orderV2(id, symbol, parameters));
+        }
         if ((symbol == null))
         {
             throw new ArgumentsRequired ((string)(this.id + " fetchOrder() requires a symbol argument")) ;
@@ -976,6 +1113,7 @@ public partial class indodax : Exchange
      * @name indodax#fetchOpenOrders
      * @description fetch all unfilled currently open orders
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#open-orders-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#pending-order
      * @param {string} symbol unified market symbol
      * @param {int} [since] the earliest time in ms to fetch open orders for
      * @param {int} [limit] the maximum number of  open orders structures to retrieve
@@ -985,6 +1123,10 @@ public partial class indodax : Exchange
     public async override Task<List<ccxt.Order>> FetchOpenOrders(string symbol = null, Int64? since = null, Int64? limit = null, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            return ccxt.BaseExchange.ToOrderList(await this.openOrdersV2(symbol, since, limit, parameters));
+        }
         if ((this.markets == null))
         {
             await this.loadMarkets();
@@ -1028,6 +1170,7 @@ public partial class indodax : Exchange
      * @name indodax#fetchClosedOrders
      * @description fetches information on multiple closed orders made by the user
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#order-history
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#order-history
      * @param {string} symbol unified market symbol of the market orders were made in
      * @param {int} [since] the earliest time in ms to fetch orders for
      * @param {int} [limit] the maximum number of order structures to retrieve
@@ -1037,6 +1180,11 @@ public partial class indodax : Exchange
     public async override Task<List<ccxt.Order>> FetchClosedOrders(string symbol = null, Int64? since = null, Int64? limit = null, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            object closedOrders = ccxt.BaseExchange.FromOrderList(await this.FetchOrders(((string)symbol),ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
+            return ccxt.BaseExchange.ToOrderList(this.filterBy(closedOrders, "status", "closed"));
+        }
         if ((symbol == null))
         {
             throw new ArgumentsRequired ((string)(this.id + " fetchClosedOrders() requires a symbol argument")) ;
@@ -1061,17 +1209,26 @@ public partial class indodax : Exchange
      * @name indodax#createOrder
      * @description create a trade order
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#trade-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
      * @param {string} symbol unified symbol of the market to create an order in
      * @param {string} type 'market' or 'limit'
      * @param {string} side 'buy' or 'sell'
      * @param {float} amount how much of currency you want to trade in units of base currency
      * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency, ignored in market orders
      * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {float} [params.cost] quote amount to spend on a market buy, only used when options.tapiVersion is "2"
+     * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
+     * @param {string} [params.timeInForce] GTC or MOC, only used when options.tapiVersion is "2"
+     * @param {string} [params.selfTradePreventionMode] EXPIRE_TAKER, EXPIRE_MAKER, or EXPIRE_BOTH, only used when options.tapiVersion is "2"
      * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
      */
     public async override Task<ccxt.Order> CreateOrder(string symbol, string type, string side, double amount, double? price = null, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            return ccxt.BaseExchange.ToOrder(await this.placeOrderV2(symbol, type, side, amount, price, parameters));
+        }
         if ((this.markets == null))
         {
             await this.loadMarkets();
@@ -1142,14 +1299,21 @@ public partial class indodax : Exchange
      * @name indodax#cancelOrder
      * @description cancels an open order
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#cancel-order-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#cancel-order
      * @param {string} id order id
      * @param {string} symbol unified symbol of the market the order was made in
      * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.side] order side, required on TAPI v1 and not used when options.tapiVersion is "2"
+     * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
      * @returns {object} An [order structure]{@link https://docs.ccxt.com/?id=order-structure}
      */
     public async override Task<ccxt.Order> CancelOrder(string id, string symbol = null, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            return ccxt.BaseExchange.ToOrder(await this.removeOrderV2(id, symbol, parameters));
+        }
         if ((symbol == null))
         {
             throw new ArgumentsRequired ((string)(this.id + " cancelOrder() requires a symbol argument")) ;
@@ -1205,6 +1369,10 @@ public partial class indodax : Exchange
     public async override Task<Dictionary<string, object>> FetchTransactionFee(string code, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            throw new NotSupported ((string)(this.id + " fetchTransactionFee() is not available when options.tapiVersion is \"2\"")) ;
+        }
         if ((this.markets == null))
         {
             await this.loadMarkets();
@@ -1241,6 +1409,10 @@ public partial class indodax : Exchange
     public async override Task<ccxt.DepositWithdrawFee> FetchDepositWithdrawFee(string code, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            throw new NotSupported ((string)(this.id + " fetchDepositWithdrawFee() is not available when options.tapiVersion is \"2\"")) ;
+        }
         await this.loadMarkets();
         Dictionary<string, object> currency = this.currency(((string)code));
         Dictionary<string, object> request = new Dictionary<string, object>() {
@@ -1271,6 +1443,7 @@ public partial class indodax : Exchange
      * @name indodax#fetchDepositsWithdrawals
      * @description fetch history of deposits and withdrawals
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#transaction-history-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
      * @param {string} [code] unified currency code for the currency of the deposit/withdrawals, default is undefined
      * @param {int} [since] timestamp in ms of the earliest deposit/withdrawal, default is undefined
      * @param {int} [limit] max number of deposit/withdrawals to return, default is undefined
@@ -1280,6 +1453,13 @@ public partial class indodax : Exchange
     public async override Task<List<ccxt.Transaction>> FetchDepositsWithdrawals(string code = null, Int64? since = null, Int64? limit = null, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            object deposits = ccxt.BaseExchange.FromTransactionList(await this.FetchDeposits(((string)code),ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
+            object withdrawals = ccxt.BaseExchange.FromTransactionList(await this.FetchWithdrawals(((string)code),ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
+            List<object> merged = this.arrayConcat(deposits, withdrawals);
+            return ccxt.BaseExchange.ToTransactionList(this.filterBySinceLimit(merged, since, limit, "timestamp"));
+        }
         if ((this.markets == null))
         {
             await this.loadMarkets();
@@ -1383,17 +1563,26 @@ public partial class indodax : Exchange
      * @name indodax#withdraw
      * @description make a withdrawal
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#withdraw-coin-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#withdraw-coin
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#withdraw-idr
      * @param {string} code unified currency code
      * @param {float} amount the amount to withdraw
      * @param {string} address the address to withdraw to
      * @param {string} tag
      * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.network] unified network code, used for crypto withdrawals when options.tapiVersion is "2"
+     * @param {string} [params.clientOrderId] client request id, only used when options.tapiVersion is "2"
+     * @param {string} [params.bankCode] bank code for an IDR withdrawal when options.tapiVersion is "2"
      * @returns {object} a [transaction structure]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     public async override Task<ccxt.Transaction> Withdraw(string code, double amount, string address, string tag = null, object parameters = null)
     {
         object tagVar = tag;
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            return ccxt.BaseExchange.ToTransaction(await this.sendWithdrawV2(code, amount, address, tagVar, parameters));
+        }
         IList<object> tagparametersVariable = (IList<object>)this.handleWithdrawTagAndParams(tagVar, parameters);
         tagVar = ((IList<object>)tagparametersVariable)[0];
         parameters = ((IList<object>)tagparametersVariable)[1];
@@ -1441,6 +1630,10 @@ public partial class indodax : Exchange
 
     public override object parseTransaction(object transaction, object currency = null)
     {
+        if (((transaction != null && ((IDictionary<string, object>)transaction).ContainsKey("coin"))) || ((transaction != null && ((IDictionary<string, object>)transaction).ContainsKey("fiatCurrency"))) || ((transaction != null && ((IDictionary<string, object>)transaction).ContainsKey("withdrawStatus"))) || ((transaction != null && ((IDictionary<string, object>)transaction).ContainsKey("depositStatus"))) || ((transaction != null && ((IDictionary<string, object>)transaction).ContainsKey("txType"))))
+        {
+            return this.parseV2Transaction(transaction, currency);
+        }
         //
         // withdraw
         //
@@ -1523,6 +1716,8 @@ public partial class indodax : Exchange
     {
         Dictionary<string, object> statuses = new Dictionary<string, object>() {
             { "success", "ok" },
+            { "pending", "pending" },
+            { "failed", "failed" },
         };
         return this.safeString(statuses, ((string)status), status);
     }
@@ -1532,13 +1727,19 @@ public partial class indodax : Exchange
      * @name indodax#fetchDepositAddresses
      * @description fetch deposit addresses for multiple currencies and chain types
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
      * @param {string[]} [codes] list of unified currency codes, default is undefined
      * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
      * @returns {object} a list of [address structures]{@link https://docs.ccxt.com/?id=address-structure}
      */
     public async override Task<List<ccxt.DepositAddress>> FetchDepositAddresses(object codes = null, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
+        if (this.isTapiV2())
+        {
+            return ccxt.BaseExchange.ToDepositAddressList(await this.depositAddressesV2(codes, parameters));
+        }
         if ((this.markets == null))
         {
             await this.loadMarkets();
@@ -1643,6 +1844,1036 @@ public partial class indodax : Exchange
         return ccxt.BaseExchange.ToDepositAddressList(result);
     }
 
+    /**
+     * @ignore
+     * @method
+     * @name indodax#balanceV2
+     * @description query account balances on TAPI v2
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-account-information
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a balance structure
+     */
+    public async virtual Task<object> balanceV2(object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        Dictionary<string, object> request = new Dictionary<string, object>() {};
+        bool? omitZeroBalances = this.safeBool(parameters, "omitZeroBalances");
+        parameters = this.omit(parameters, new List<object>() {"omitZeroBalances"});
+        if (!isEqual(omitZeroBalances, null))
+        {
+            ((IDictionary<string,object>)request)["omitZeroBalances"] = omitZeroBalances;
+        }
+        object response = await ((Task<object>)callDynamically(this, "v2GetAccount", new object[] { this.extend(request, parameters) }));
+        return this.parseBalanceV2(response);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#parseBalanceV2
+     * @param {object} response account response
+     * @returns {object} a balance structure
+     */
+    public virtual object parseBalanceV2(object response)
+    {
+        List<object> balances = this.safeList(response, "balances", new List<object>() {});
+        Dictionary<string, object> result = new Dictionary<string, object>() {
+            { "info", response },
+        };
+        for (int i = 0; i < balances.Count; i++)
+        {
+            object entry = balances[i];
+            string? currencyId = this.safeString(entry, "asset");
+            string? code = this.safeCurrencyCode(currencyId);
+            Dictionary<string, object> account = this.account();
+            ((IDictionary<string,object>)account)["free"] = this.safeString(entry, "free");
+            ((IDictionary<string,object>)account)["used"] = this.safeString(entry, "locked");
+            if ((code != null))
+            {
+                ((IDictionary<string,object>)result)[(string)code] = account;
+            }
+        }
+        return this.safeBalance(result);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#parseV2Order
+     * @param {object} order raw order
+     * @param {object} [market] market structure
+     * @returns {object} an order structure
+     */
+    public virtual object parseV2Order(object order, object market = null)
+    {
+        string? marketId = this.safeStringLower(order, "symbol");
+        market = this.safeMarket(marketId, market);
+        string? rawStatus = this.safeString(order, "status");
+        string? status = null;
+        if ((rawStatus != null))
+        {
+            status = this.parseOrderStatus(rawStatus);
+        }
+        Int64? timestamp = this.safeInteger2(order, "time", "submitTime");
+        string? amount = this.safeString2(order, "origQty", "oriQty");
+        string? filled = this.safeString(order, "executedQty");
+        string? remaining = null;
+        if (((amount != null)) && ((filled != null)))
+        {
+            remaining = Precise.stringSub(amount, filled);
+        }
+        return new Dictionary<string, object>() {
+            { "info", order },
+            { "id", this.safeString2(order, "fullOrderId", "orderId") },
+            { "clientOrderId", this.safeString2(order, "clientOrderId", "origClientOrderId") },
+            { "timestamp", timestamp },
+            { "datetime", this.iso8601(timestamp) },
+            { "lastTradeTimestamp", this.safeInteger(order, "finishTime") },
+            { "symbol", this.safeSymbol(marketId, market) },
+            { "type", this.safeStringLower(order, "type") },
+            { "timeInForce", this.safeString(order, "timeInForce") },
+            { "postOnly", null },
+            { "side", this.safeStringLower(order, "side") },
+            { "price", this.parseNumber(this.safeString(order, "price")) },
+            { "triggerPrice", null },
+            { "cost", null },
+            { "average", null },
+            { "amount", this.parseNumber(amount) },
+            { "filled", this.parseNumber(filled) },
+            { "remaining", this.parseNumber(remaining) },
+            { "status", status },
+            { "fee", null },
+            { "trades", new List<object>() {} },
+            { "fees", new List<object>() {} },
+            { "lastUpdateTimestamp", null },
+            { "reduceOnly", null },
+            { "stopPrice", null },
+            { "takeProfitPrice", null },
+            { "stopLossPrice", null },
+        };
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#parseV2Trade
+     * @param {object} trade raw trade
+     * @param {object} [market] market structure
+     * @returns {object} a trade structure
+     */
+    public virtual object parseV2Trade(object trade, object market = null)
+    {
+        string? marketId = this.safeStringLower(trade, "symbol");
+        market = this.safeMarket(marketId, market);
+        Int64? timestamp = this.safeInteger(trade, "time");
+        bool? isBuyer = this.safeBool(trade, "isBuyer");
+        string? side = null;
+        if ((isBuyer == true))
+        {
+            side = "buy";
+        } else if ((isBuyer == false))
+        {
+            side = "sell";
+        }
+        bool? isMaker = this.safeBool(trade, "isMaker");
+        string? takerOrMaker = null;
+        if ((isMaker == true))
+        {
+            takerOrMaker = "maker";
+        } else if ((isMaker == false))
+        {
+            takerOrMaker = "taker";
+        }
+        string? feeCost = this.safeString(trade, "commission");
+        Dictionary<string, object> fee = null;
+        if ((feeCost != null))
+        {
+            fee = new Dictionary<string, object>() {
+                { "currency", this.safeCurrencyCode(this.safeString(trade, "commissionAsset")) },
+                { "cost", this.parseNumber(feeCost) },
+                { "rate", null },
+            };
+        }
+        return this.safeTrade(new Dictionary<string, object>() {
+            { "id", this.safeString(trade, "tradeId") },
+            { "info", trade },
+            { "timestamp", timestamp },
+            { "datetime", this.iso8601(timestamp) },
+            { "symbol", this.safeSymbol(marketId, market) },
+            { "type", null },
+            { "side", side },
+            { "order", this.safeString(trade, "orderId") },
+            { "takerOrMaker", takerOrMaker },
+            { "price", this.safeString(trade, "price") },
+            { "amount", this.safeString(trade, "qty") },
+            { "cost", this.safeString(trade, "quoteQty") },
+            { "fee", fee },
+        }, market);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#v2OrderRequest
+     * @param {string} id order id
+     * @param {string} symbol unified symbol
+     * @param {object} params extra parameters
+     * @returns {object[]} request and remaining params
+     */
+    public virtual object v2OrderRequest(object id, object symbol, object parameters)
+    {
+        if ((symbol == null))
+        {
+            throw new ArgumentsRequired ((string)(this.id + " order endpoints require a symbol argument")) ;
+        }
+        Dictionary<string, object> market = this.market(symbol);
+        string? clientOrderId = this.safeString(parameters, "clientOrderId");
+        parameters = this.omit(parameters, new List<object>() {"clientOrderId"});
+        Dictionary<string, object> request = new Dictionary<string, object>() {
+            { "symbol", this.tapiV2Symbol(market) },
+        };
+        if ((clientOrderId != null))
+        {
+            ((IDictionary<string,object>)request)["origClientOrderId"] = clientOrderId;
+        } else
+        {
+            ((IDictionary<string,object>)request)["fullOrderId"] = id;
+        }
+        return new List<object>() {market, request, parameters};
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#orderV2
+     * @param {string} id order id
+     * @param {string} symbol unified symbol
+     * @param {object} [params] extra parameters
+     * @returns {object} an order structure
+     */
+    public async virtual Task<object> orderV2(object id, object symbol = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        object orderRequest = this.v2OrderRequest(id, symbol, parameters);
+        object market = getValue(orderRequest, 0);
+        object request = getValue(orderRequest, 1);
+        parameters = getValue(orderRequest, 2);
+        object response = await ((Task<object>)callDynamically(this, "v2GetOrder", new object[] { this.extend(request, parameters) }));
+        return this.parseOrder(response, market);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#openOrdersV2
+     * @param {string} [symbol] unified symbol
+     * @param {int} [since] earliest timestamp
+     * @param {int} [limit] max number of orders
+     * @param {object} [params] extra parameters
+     * @returns {object[]} a list of order structures
+     */
+    public async virtual Task<object> openOrdersV2(object symbol = null, object since = null, object limit = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        IDictionary<string, object> market = null;
+        Dictionary<string, object> request = new Dictionary<string, object>() {};
+        if ((symbol != null))
+        {
+            market = this.market(symbol);
+            ((IDictionary<string,object>)request)["symbol"] = this.tapiV2Symbol(market);
+        }
+        object response = await ((Task<object>)callDynamically(this, "v2GetOpenOrders", new object[] { this.extend(request, parameters) }));
+        IList<object> rows = this.toArray(response);
+        return this.parseOrders(rows, market, since, limit);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#clampV2Limit
+     * @param {int} [limit] requested limit
+     * @returns {int} limit clamped to 10-1000
+     */
+    public virtual object clampV2Limit(object limit = null)
+    {
+        if ((limit == null))
+        {
+            return null;
+        }
+        if (isLessThan(limit, 10))
+        {
+            return 10;
+        }
+        if (isGreaterThan(limit, 1000))
+        {
+            return 1000;
+        }
+        return limit;
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#historyV2
+     * @param {string} historyKind orders or trades
+     * @param {string} symbol unified symbol
+     * @param {int} [since] earliest timestamp
+     * @param {int} [until] latest timestamp
+     * @param {int} [limit] max rows per request
+     * @param {object} [params] extra parameters
+     * @returns {object[]} raw rows
+     */
+    public async virtual Task<object> historyV2(object historyKind, object symbol, object since = null, object until = null, object limit = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        Dictionary<string, object> market = this.market(symbol);
+        parameters = this.omit(parameters, new List<object>() {"symbol", "startTime", "endTime", "limit"});
+        Int64 maxSpan = (((multiply(7, 24) * 60) * 60) * 1000);
+        object requestLimit = this.clampV2Limit(limit);
+        List<object> result = new List<object>() {};
+        object windowStart = since;
+        object windowEnd = until;
+        if ((isEqual(windowStart, null)) && (isEqual(windowEnd, null)))
+        {
+            Dictionary<string, object> request = new Dictionary<string, object>() {
+                { "symbol", this.tapiV2Symbol(market) },
+            };
+            if (!isEqual(requestLimit, null))
+            {
+                ((IDictionary<string,object>)request)["limit"] = requestLimit;
+            }
+            object response = null;
+            if (isEqual(historyKind, "orders"))
+            {
+                response = await ((Task<object>)callDynamically(this, "v2GetOrderHistories", new object[] { this.extend(request, parameters) }));
+            } else
+            {
+                response = await ((Task<object>)callDynamically(this, "v2GetMyTrades", new object[] { this.extend(request, parameters) }));
+            }
+            return this.safeList(response, "data", new List<object>() {});
+        }
+        if (isEqual(windowEnd, null))
+        {
+            windowEnd = this.milliseconds();
+        }
+        if (isEqual(windowStart, null))
+        {
+            windowStart = subtract(windowEnd, maxSpan);
+        }
+        object cursor = windowStart;
+        while (isLessThan(cursor, windowEnd))
+        {
+            object chunkEnd = add(cursor, maxSpan);
+            if (isGreaterThan(chunkEnd, windowEnd))
+            {
+                chunkEnd = windowEnd;
+            }
+            Dictionary<string, object> request = new Dictionary<string, object>() {
+                { "symbol", this.tapiV2Symbol(market) },
+                { "startTime", cursor },
+                { "endTime", chunkEnd },
+            };
+            if (!isEqual(requestLimit, null))
+            {
+                ((IDictionary<string,object>)request)["limit"] = requestLimit;
+            }
+            object response = null;
+            if (isEqual(historyKind, "orders"))
+            {
+                response = await ((Task<object>)callDynamically(this, "v2GetOrderHistories", new object[] { this.extend(request, parameters) }));
+            } else
+            {
+                response = await ((Task<object>)callDynamically(this, "v2GetMyTrades", new object[] { this.extend(request, parameters) }));
+            }
+            List<object> rows = this.safeList(response, "data", new List<object>() {});
+            for (int i = 0; i < rows.Count; i++)
+            {
+                ((IList<object>)result).Add(rows[i]);
+            }
+            if (isEqual(chunkEnd, cursor))
+            {
+                break;
+            }
+            cursor = chunkEnd;
+        }
+        return result;
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchOrders
+     * @description fetches information on multiple orders made by the user
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#order-history
+     * @param {string} symbol unified market symbol of the market orders were made in
+     * @param {int} [since] the earliest time in ms to fetch orders for
+     * @param {int} [limit] the maximum number of order structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.until] the latest time in ms to fetch orders for
+     * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    public async override Task<List<ccxt.Order>> FetchOrders(string symbol = null, Int64? since = null, Int64? limit = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if (!this.isTapiV2())
+        {
+            throw new NotSupported ((string)(this.id + " fetchOrders() requires options.tapiVersion set to \"2\"")) ;
+        }
+        if ((symbol == null))
+        {
+            throw new ArgumentsRequired ((string)(this.id + " fetchOrders() requires a symbol argument")) ;
+        }
+        Int64? until = this.safeInteger(parameters, "until");
+        parameters = this.omit(parameters, new List<object>() {"until"});
+        object rows = await this.historyV2("orders", symbol, since, until, limit, parameters);
+        Dictionary<string, object> market = this.market(symbol);
+        return ccxt.BaseExchange.ToOrderList(this.parseOrders(rows, market, since, limit));
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchMyTrades
+     * @description fetch all trades made by the user
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#trade-history
+     * @param {string} symbol unified market symbol
+     * @param {int} [since] the earliest time in ms to fetch trades for
+     * @param {int} [limit] the maximum number of trades structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.until] the latest time in ms to fetch trades for
+     * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
+     */
+    public async override Task<List<ccxt.Trade>> FetchMyTrades(string symbol = null, Int64? since = null, Int64? limit = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if (!this.isTapiV2())
+        {
+            throw new NotSupported ((string)(this.id + " fetchMyTrades() requires options.tapiVersion set to \"2\"")) ;
+        }
+        if ((symbol == null))
+        {
+            throw new ArgumentsRequired ((string)(this.id + " fetchMyTrades() requires a symbol argument")) ;
+        }
+        Int64? until = this.safeInteger(parameters, "until");
+        parameters = this.omit(parameters, new List<object>() {"until"});
+        object rows = await this.historyV2("trades", symbol, since, until, limit, parameters);
+        Dictionary<string, object> market = this.market(symbol);
+        return ccxt.BaseExchange.ToTradeList(this.parseTrades(rows, market, since, limit));
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#placeOrderV2
+     * @param {string} symbol unified symbol
+     * @param {string} orderType market or limit
+     * @param {string} side buy or sell
+     * @param {float} amount base amount
+     * @param {float} [price] price
+     * @param {object} [params] extra parameters
+     * @returns {object} an order structure
+     */
+    public async virtual Task<object> placeOrderV2(object symbol, object orderType, object side, object amount, object price = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        Dictionary<string, object> market = this.market(symbol);
+        if ((side == null))
+        {
+            throw new ArgumentsRequired ((string)(this.id + " createOrder() requires a side argument")) ;
+        }
+        string? clientOrderId = this.safeString(parameters, "clientOrderId");
+        string? timeInForce = this.safeString(parameters, "timeInForce");
+        string? selfTradePreventionMode = this.safeString(parameters, "selfTradePreventionMode");
+        string? cost = this.safeString(parameters, "cost");
+        parameters = this.omit(parameters, new List<object>() {"clientOrderId", "timeInForce", "selfTradePreventionMode", "cost"});
+        Dictionary<string, object> request = new Dictionary<string, object>() {
+            { "symbol", this.tapiV2Symbol(market) },
+            { "side", ((string)side).ToUpper() },
+            { "type", ((string)orderType).ToUpper() },
+        };
+        if (isEqual(orderType, "market"))
+        {
+            if (isEqual(side, "buy"))
+            {
+                string? quoteAmount = null;
+                if ((cost != null))
+                {
+                    quoteAmount = this.costToPrecision(symbol, cost);
+                } else
+                {
+                    if ((price == null))
+                    {
+                        throw new InvalidOrder ((string)(this.id + " createOrder() requires the price argument or params.cost for market buy orders")) ;
+                    }
+                    string? amountString = this.numberToString(amount);
+                    string? priceString = this.numberToString(price);
+                    quoteAmount = this.costToPrecision(symbol, Precise.stringMul(amountString, priceString));
+                }
+                ((IDictionary<string,object>)request)["quoteOrderQty"] = quoteAmount;
+            } else
+            {
+                ((IDictionary<string,object>)request)["quantity"] = this.amountToPrecision(symbol, amount);
+            }
+        } else if (isEqual(orderType, "limit"))
+        {
+            if ((price == null))
+            {
+                throw new InvalidOrder ((string)(this.id + " createOrder() requires a price argument for a limit order")) ;
+            }
+            ((IDictionary<string,object>)request)["price"] = this.priceToPrecision(symbol, price);
+            ((IDictionary<string,object>)request)["quantity"] = this.amountToPrecision(symbol, amount);
+            if ((timeInForce != null))
+            {
+                ((IDictionary<string,object>)request)["timeInForce"] = timeInForce;
+            }
+        } else
+        {
+            throw new InvalidOrder ((string)((this.id + " createOrder() does not support order type ") + (orderType))) ;
+        }
+        if ((clientOrderId != null))
+        {
+            ((IDictionary<string,object>)request)["newClientOrderId"] = clientOrderId;
+        }
+        if ((selfTradePreventionMode != null))
+        {
+            ((IDictionary<string,object>)request)["selfTradePreventionMode"] = selfTradePreventionMode;
+        }
+        object response = await ((Task<object>)callDynamically(this, "v2PostOrder", new object[] { this.extend(request, parameters) }));
+        return this.parseOrder(response, market);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#removeOrderV2
+     * @param {string} id order id
+     * @param {string} symbol unified symbol
+     * @param {object} [params] extra parameters
+     * @returns {object} an order structure
+     */
+    public async virtual Task<object> removeOrderV2(object id, object symbol = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        object orderRequest = this.v2OrderRequest(id, symbol, parameters);
+        object market = getValue(orderRequest, 0);
+        object request = getValue(orderRequest, 1);
+        parameters = getValue(orderRequest, 2);
+        object response = await ((Task<object>)callDynamically(this, "v2DeleteOrder", new object[] { this.extend(request, parameters) }));
+        return this.parseOrder(response, market);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#v2CurrencyCodes
+     * @param {string[]} [codes] unified currency codes
+     * @returns {string[]} codes to query
+     */
+    public virtual object v2CurrencyCodes(object codes = null)
+    {
+        if ((codes != null))
+        {
+            return codes;
+        }
+        Dictionary<string, object> seen = new Dictionary<string, object>() {};
+        List<object> result = new List<object>() {};
+        IList<object> marketList = this.toArray(this.markets);
+        for (int i = 0; i < (marketList?.Count ?? 0); i++)
+        {
+            object market = marketList[i];
+            string? bs = this.safeString(market, "base");
+            string? quote = this.safeString(market, "quote");
+            if (((bs != null)) && !(seen.ContainsKey(bs)))
+            {
+                ((IDictionary<string,object>)seen)[(string)bs] = true;
+                ((IList<object>)result).Add(bs);
+            }
+            if (((quote != null)) && !(seen.ContainsKey(quote)))
+            {
+                ((IDictionary<string,object>)seen)[(string)quote] = true;
+                ((IList<object>)result).Add(quote);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#depositAddressesV2
+     * @param {string[]} [codes] unified currency codes
+     * @param {object} [params] extra parameters
+     * @returns {object} a dictionary of address structures
+     */
+    public async virtual Task<object> depositAddressesV2(object codes = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        string? networkCode = null;
+        IList<object> networkCodeparametersVariable = (IList<object>)this.handleNetworkCodeAndParams(parameters);
+        networkCode = (string)((IList<object>)networkCodeparametersVariable)[0];
+        parameters = ((IList<object>)networkCodeparametersVariable)[1];
+        object currencyCodes = this.v2CurrencyCodes(codes);
+        Dictionary<string, object> result = new Dictionary<string, object>() {
+            { "info", new List<object>() {} },
+        };
+        for (int i = 0; i < getArrayLength(currencyCodes); i++)
+        {
+            object code = getValue(currencyCodes, i);
+            Dictionary<string, object> currency = this.currency(((string)code));
+            Dictionary<string, object> request = new Dictionary<string, object>() {
+                { "coin", (currency.ContainsKey("id") ? currency["id"] : null) },
+            };
+            if ((networkCode != null))
+            {
+                ((IDictionary<string,object>)request)["network"] = this.networkCodeToId(networkCode, code);
+            }
+            object response = await ((Task<object>)callDynamically(this, "v2GetCapitalDepositAddressList", new object[] { this.extend(request, parameters) }));
+            IList<object> rows = this.toArray(response);
+            List<object> info = this.safeList(result, "info", new List<object>() {});
+            for (int j = 0; j < (rows?.Count ?? 0); j++)
+            {
+                ((IList<object>)info).Add(rows[j]);
+            }
+            ((IDictionary<string,object>)result)["info"] = info;
+            if ((rows?.Count ?? 0) < 1)
+            {
+                continue;
+            }
+            object row = getValue(rows, 0);
+            string? address = this.safeString(row, "address");
+            if ((address != null))
+            {
+                this.checkAddress(address);
+            }
+            string? networkId = this.safeString(row, "network");
+            ((IDictionary<string,object>)result)[(string)(currency.ContainsKey("code") ? currency["code"] : null)] = new Dictionary<string, object>() {
+                { "info", row },
+                { "currency", (currency.ContainsKey("code") ? currency["code"] : null) },
+                { "network", this.networkIdToCode(networkId, (currency.ContainsKey("code") ? currency["code"] : null)) },
+                { "address", address },
+                { "tag", this.safeString(row, "tag") },
+            };
+        }
+        return result;
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#windowV2
+     * @param {int} [since] earliest timestamp
+     * @param {int} [until] latest timestamp
+     * @param {int} maxSpan maximum window in ms
+     * @returns {int[][]} windows of start and end
+     */
+    public virtual object windowV2(object since, object until, object maxSpan)
+    {
+        object windowStart = since;
+        object windowEnd = until;
+        if ((isEqual(windowStart, null)) && (isEqual(windowEnd, null)))
+        {
+            return new List<object>() {new List<object>() {null, null}};
+        }
+        if (isEqual(windowEnd, null))
+        {
+            windowEnd = this.milliseconds();
+        }
+        if (isEqual(windowStart, null))
+        {
+            windowStart = subtract(windowEnd, maxSpan);
+        }
+        List<object> windows = new List<object>() {};
+        object cursor = windowStart;
+        while (isLessThan(cursor, windowEnd))
+        {
+            object chunkEnd = add(cursor, maxSpan);
+            if (isGreaterThan(chunkEnd, windowEnd))
+            {
+                chunkEnd = windowEnd;
+            }
+            ((IList<object>)windows).Add(new List<object>() {cursor, chunkEnd});
+            if (isEqual(chunkEnd, cursor))
+            {
+                break;
+            }
+            cursor = chunkEnd;
+        }
+        return windows;
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#capitalHistoryV2
+     * @param {string} direction deposit or withdraw
+     * @param {string} [code] unified currency code
+     * @param {int} [since] earliest timestamp
+     * @param {int} [until] latest timestamp
+     * @param {int} [limit] max rows
+     * @param {object} [params] extra parameters
+     * @returns {object[]} raw rows
+     */
+    public async virtual Task<object> capitalHistoryV2(object direction, object code = null, object since = null, object until = null, object limit = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        parameters = this.omit(parameters, new List<object>() {"coin", "startTime", "endTime", "limit"});
+        object requestLimit = this.clampV2Limit(limit);
+        Int64 maxSpan = (((multiply(90, 24) * 60) * 60) * 1000);
+        object windows = this.windowV2(since, until, maxSpan);
+        List<object> result = new List<object>() {};
+        for (int i = 0; i < getArrayLength(windows); i++)
+        {
+            object window = getValue(windows, i);
+            Dictionary<string, object> request = new Dictionary<string, object>() {};
+            if ((code != null))
+            {
+                Dictionary<string, object> currency = this.currency(((string)code));
+                ((IDictionary<string,object>)request)["coin"] = (currency.ContainsKey("id") ? currency["id"] : null);
+            }
+            if (!isEqual(getValue(window, 0), null))
+            {
+                ((IDictionary<string,object>)request)["startTime"] = getValue(window, 0);
+            }
+            if (!isEqual(getValue(window, 1), null))
+            {
+                ((IDictionary<string,object>)request)["endTime"] = getValue(window, 1);
+            }
+            if (!isEqual(requestLimit, null))
+            {
+                ((IDictionary<string,object>)request)["limit"] = requestLimit;
+            }
+            object response = null;
+            if (isEqual(direction, "deposit"))
+            {
+                response = await ((Task<object>)callDynamically(this, "v2GetCapitalDepositHisrec", new object[] { this.extend(request, parameters) }));
+            } else
+            {
+                response = await ((Task<object>)callDynamically(this, "v2GetCapitalWithdrawHistory", new object[] { this.extend(request, parameters) }));
+            }
+            IList<object> rows = this.toArray(response);
+            for (int j = 0; j < (rows?.Count ?? 0); j++)
+            {
+                object row = rows[j];
+                ((IDictionary<string,object>)row)["txType"] = (isEqual(direction, "deposit")) ? "deposit" : "withdraw";
+                ((IList<object>)result).Add(row);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#fiatHistoryV2
+     * @param {string} direction deposit or withdraw
+     * @param {string} [code] unified currency code
+     * @param {int} [since] earliest timestamp
+     * @param {int} [until] latest timestamp
+     * @param {int} [limit] max rows
+     * @param {object} [params] extra parameters
+     * @returns {object[]} raw rows
+     */
+    public async virtual Task<object> fiatHistoryV2(object direction, object code = null, object since = null, object until = null, object limit = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if (((code != null)) && (!isEqual(code, "IDR")))
+        {
+            return new List<object>() {};
+        }
+        parameters = this.omit(parameters, new List<object>() {"transactionType", "beginTime", "endTime", "limit"});
+        object requestLimit = this.clampV2Limit(limit);
+        Int64 maxSpan = (((multiply(30, 24) * 60) * 60) * 1000);
+        object windows = this.windowV2(since, until, maxSpan);
+        List<object> result = new List<object>() {};
+        for (int i = 0; i < getArrayLength(windows); i++)
+        {
+            object window = getValue(windows, i);
+            Dictionary<string, object> request = new Dictionary<string, object>() {};
+            if (isEqual(direction, "deposit"))
+            {
+                ((IDictionary<string,object>)request)["transactionType"] = "0";
+            }
+            if (!isEqual(getValue(window, 0), null))
+            {
+                ((IDictionary<string,object>)request)["beginTime"] = getValue(window, 0);
+            }
+            if (!isEqual(getValue(window, 1), null))
+            {
+                ((IDictionary<string,object>)request)["endTime"] = getValue(window, 1);
+            }
+            if (!isEqual(requestLimit, null))
+            {
+                ((IDictionary<string,object>)request)["limit"] = requestLimit;
+            }
+            object response = await ((Task<object>)callDynamically(this, "v2GetFiatOrders", new object[] { this.extend(request, parameters) }));
+            List<object> rows = this.safeList(response, "data", new List<object>() {});
+            for (int j = 0; j < rows.Count; j++)
+            {
+                object row = rows[j];
+                ((IDictionary<string,object>)row)["txType"] = (isEqual(direction, "deposit")) ? "deposit" : "withdraw";
+                ((IList<object>)result).Add(row);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchDeposits
+     * @description fetch all deposits made to an account
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
+     * @param {string} [code] unified currency code
+     * @param {int} [since] the earliest time in ms to fetch deposits for
+     * @param {int} [limit] the maximum number of deposits structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.until] the latest time in ms to fetch deposits for
+     * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
+     */
+    public async override Task<List<ccxt.Transaction>> FetchDeposits(string code = null, Int64? since = null, Int64? limit = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if (!this.isTapiV2())
+        {
+            throw new NotSupported ((string)(this.id + " fetchDeposits() requires options.tapiVersion set to \"2\"")) ;
+        }
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        Int64? until = this.safeInteger(parameters, "until");
+        parameters = this.omit(parameters, new List<object>() {"until"});
+        List<object> rows = new List<object>() {};
+        if ((code != "IDR"))
+        {
+            object cryptoRows = await this.capitalHistoryV2("deposit", code, since, until, limit, parameters);
+            rows = this.arrayConcat(rows, cryptoRows);
+        }
+        if (((code == null)) || ((code == "IDR")))
+        {
+            object fiatRows = await this.fiatHistoryV2("deposit", code, since, until, limit, parameters);
+            rows = this.arrayConcat(rows, fiatRows);
+        }
+        Dictionary<string, object> currency = ((code == null)) ? null : this.currency(((string)code));
+        return ccxt.BaseExchange.ToTransactionList(this.parseTransactions(rows, currency, since, limit));
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchWithdrawals
+     * @description fetch all withdrawals made from an account
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
+     * @param {string} [code] unified currency code
+     * @param {int} [since] the earliest time in ms to fetch withdrawals for
+     * @param {int} [limit] the maximum number of withdrawals structures to retrieve
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {int} [params.until] the latest time in ms to fetch withdrawals for
+     * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
+     */
+    public async override Task<List<ccxt.Transaction>> FetchWithdrawals(string code = null, Int64? since = null, Int64? limit = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        if (!this.isTapiV2())
+        {
+            throw new NotSupported ((string)(this.id + " fetchWithdrawals() requires options.tapiVersion set to \"2\"")) ;
+        }
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        Int64? until = this.safeInteger(parameters, "until");
+        parameters = this.omit(parameters, new List<object>() {"until"});
+        List<object> rows = new List<object>() {};
+        if ((code != "IDR"))
+        {
+            object cryptoRows = await this.capitalHistoryV2("withdraw", code, since, until, limit, parameters);
+            rows = this.arrayConcat(rows, cryptoRows);
+        }
+        if (((code == null)) || ((code == "IDR")))
+        {
+            object fiatRows = await this.fiatHistoryV2("withdraw", code, since, until, limit, parameters);
+            rows = this.arrayConcat(rows, fiatRows);
+        }
+        Dictionary<string, object> currency = ((code == null)) ? null : this.currency(((string)code));
+        return ccxt.BaseExchange.ToTransactionList(this.parseTransactions(rows, currency, since, limit));
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#parseV2Transaction
+     * @param {object} transaction raw transaction
+     * @param {object} [currency] currency structure
+     * @returns {object} a transaction structure
+     */
+    public virtual object parseV2Transaction(object transaction, object currency = null)
+    {
+        string? txKind = this.safeString(transaction, "txType");
+        string? coin = this.safeString(transaction, "coin");
+        string? fiatCurrency = this.safeString(transaction, "fiatCurrency");
+        string? currencyId = ((coin != null)) ? coin : fiatCurrency;
+        string? code = this.safeCurrencyCode(currencyId, currency);
+        string? status = this.safeStringN(transaction, new List<object>() {"withdrawStatus", "depositStatus", "status"});
+        Int64? timestamp = this.safeInteger2(transaction, "createTime", "updateTime");
+        if (isEqual(timestamp, null))
+        {
+            string? timeString = this.safeStringN(transaction, new List<object>() {"applyTime", "insertTime", "completeTime"});
+            timestamp = this.parse8601(timeString);
+        }
+        Int64? updated = this.safeInteger(transaction, "updateTime");
+        if (isEqual(updated, null))
+        {
+            updated = this.parse8601(this.safeString(transaction, "completeTime"));
+        }
+        double? feeCost = this.safeNumber2(transaction, "transactionFee", "totalFee");
+        Dictionary<string, object> fee = null;
+        if (!isEqual(feeCost, null))
+        {
+            fee = new Dictionary<string, object>() {
+                { "currency", code },
+                { "cost", feeCost },
+                { "rate", null },
+            };
+        }
+        string? networkId = this.safeString(transaction, "network");
+        return new Dictionary<string, object>() {
+            { "id", this.safeString2(transaction, "id", "orderNo") },
+            { "txid", this.safeString(transaction, "txId") },
+            { "timestamp", timestamp },
+            { "datetime", this.iso8601(timestamp) },
+            { "network", this.networkIdToCode(networkId, code) },
+            { "addressFrom", null },
+            { "address", this.safeString(transaction, "address") },
+            { "addressTo", null },
+            { "amount", this.safeNumber(transaction, "amount") },
+            { "type", ((txKind == null)) ? null : txKind },
+            { "currency", code },
+            { "status", this.parseTransactionStatus(status) },
+            { "updated", updated },
+            { "tagFrom", null },
+            { "tag", this.safeString(transaction, "addressTag") },
+            { "tagTo", null },
+            { "comment", null },
+            { "internal", null },
+            { "fee", fee },
+            { "info", transaction },
+        };
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#sendWithdrawV2
+     * @param {string} code unified currency code
+     * @param {float} amount amount to withdraw
+     * @param {string} address destination address or bank account number
+     * @param {string} [tag] unused on TAPI v2
+     * @param {object} [params] extra parameters
+     * @returns {object} a transaction structure
+     */
+    public async virtual Task<object> sendWithdrawV2(object code, object amount, object address, object tag = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        IList<object> tagparametersVariable = (IList<object>)this.handleWithdrawTagAndParams(tag, parameters);
+        tag = ((IList<object>)tagparametersVariable)[0];
+        parameters = ((IList<object>)tagparametersVariable)[1];
+        if ((this.markets == null))
+        {
+            await this.loadMarkets();
+        }
+        Dictionary<string, object> currency = this.currency(((string)code));
+        if ((((currency.ContainsKey("code") ? currency["code"] : null) as string) == "IDR"))
+        {
+            string? bankCode = this.safeString(parameters, "bankCode");
+            string? clientRequestId = this.safeString(parameters, "clientOrderId", ((object)this.milliseconds()).ToString());
+            parameters = this.omit(parameters, new List<object>() {"bankCode", "clientOrderId"});
+            Dictionary<string, object> accountInfo = new Dictionary<string, object>() {
+                { "accountNumber", address },
+            };
+            if ((bankCode != null))
+            {
+                ((IDictionary<string,object>)accountInfo)["bankCodeForPix"] = bankCode;
+            }
+            Dictionary<string, object> fiatRequest = new Dictionary<string, object>() {
+                { "apiPaymentMethod", "bank_transfer" },
+                { "currency", "idr" },
+                { "amount", this.parseToInt(amount) },
+                { "accountInfo", this.json(accountInfo) },
+                { "clientRequestId", clientRequestId },
+            };
+            object fiatResponse = await ((Task<object>)callDynamically(this, "v2PostFiatWithdraw", new object[] { this.extend(fiatRequest, parameters) }));
+            IDictionary<string, object> data = this.safeDict(fiatResponse, "data", new Dictionary<string, object>() {});
+            string? orderId = this.safeString(data, "orderId");
+            return this.parseV2Transaction(new Dictionary<string, object>() {
+                { "orderNo", orderId },
+                { "fiatCurrency", "IDR" },
+                { "amount", this.numberToString(amount) },
+                { "txType", "withdraw" },
+                { "address", address },
+            }, currency);
+        }
+        this.checkAddress(address);
+        string? networkCode = null;
+        IList<object> networkCodeparametersVariable = (IList<object>)this.handleNetworkCodeAndParams(parameters);
+        networkCode = (string)((IList<object>)networkCodeparametersVariable)[0];
+        parameters = ((IList<object>)networkCodeparametersVariable)[1];
+        string? withdrawOrderId = this.safeString(parameters, "clientOrderId", ((object)this.milliseconds()).ToString());
+        parameters = this.omit(parameters, new List<object>() {"clientOrderId"});
+        Dictionary<string, object> request = new Dictionary<string, object>() {
+            { "coin", (currency.ContainsKey("id") ? currency["id"] : null) },
+            { "address", address },
+            { "amount", this.numberToString(amount) },
+            { "withdrawOrderId", withdrawOrderId },
+        };
+        if ((networkCode != null))
+        {
+            ((IDictionary<string,object>)request)["network"] = this.networkCodeToId(networkCode, (currency.ContainsKey("code") ? currency["code"] : null));
+        }
+        object response = await ((Task<object>)callDynamically(this, "v2PostCapitalWithdrawApply", new object[] { this.extend(request, parameters) }));
+        ((IDictionary<string,object>)response)["txType"] = "withdraw";
+        return this.parseV2Transaction(response, currency);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#sign
+     * @description sign an api request; when options.sandboxUrl is set, v2 requests use that base host with no trailing path
+     * @param {string} path endpoint path
+     * @param {string} [api] api section, public, private, or v2
+     * @param {string} [method] http method
+     * @param {object} [params] request parameters
+     * @param {object} [headers] request headers
+     * @param {string} [body] request body
+     * @returns {object} a signed request with url, method, body, and headers
+     */
     public override object sign(object path, object api = null, object method = null, object parameters = null, object headers = null, object body = null)
     {
         api ??= "public";
@@ -1657,6 +2888,32 @@ public partial class indodax : Exchange
             if ((new List<object>(((IDictionary<string,object>)query).Keys)).Count > 0)
             {
                 url = add(url, ("?" + this.urlencodeWithArrayRepeat(query)));
+            }
+        } else if (isEqual(api, "v2"))
+        {
+            this.checkRequiredCredentials();
+            string? sandboxUrl = this.safeString(this.options, "sandboxUrl");
+            if (((sandboxUrl != null)) && ((sandboxUrl != "")))
+            {
+                url = sandboxUrl;
+            }
+            url = add(add(url, "/api/v2/"), this.implodeParams(path, parameters));
+            string query = this.urlencode(this.extend(new Dictionary<string, object>() {
+                { "timestamp", this.nonce() },
+                { "recvWindow", this.safeInteger(this.options, "recvWindow", 5000) },
+            }, parameters));
+            string signature = this.hmac(this.encode(query), this.encode(this.secret), sha256);
+            headers = new Dictionary<string, object>() {
+                { "X-APIKEY", this.apiKey },
+                { "Sign", signature },
+            };
+            if (isEqual(method, "POST"))
+            {
+                body = query;
+                ((IDictionary<string,object>)headers)["Content-Type"] = "application/x-www-form-urlencoded";
+            } else
+            {
+                url = add(url, ("?" + query));
             }
         } else
         {
@@ -1693,6 +2950,31 @@ public partial class indodax : Exchange
         if (((response is IList<object>) || (response.GetType().IsGenericType && response.GetType().GetGenericTypeDefinition().IsAssignableFrom(typeof(List<>)))))
         {
             return null;  // public endpoints may return []-arrays
+        }
+        Int64? errorCode = this.safeInteger(response, "code");
+        if ((!isEqual(errorCode, null)) && (isLessThan(errorCode, 0)))
+        {
+            string? message = this.safeString(response, "msg", "");
+            string errorFeedback = ((this.id + " ") + (body));
+            if (isEqual(errorCode, -2010))
+            {
+                if (getIndexOf(message, "alance") >= 0)
+                {
+                    throw new InsufficientFunds ((string)errorFeedback) ;
+                }
+                throw new InvalidOrder ((string)errorFeedback) ;
+            }
+            if (isEqual(errorCode, -1016))
+            {
+                if (getIndexOf(message, "aintenance") >= 0)
+                {
+                    throw new OnMaintenance ((string)errorFeedback) ;
+                }
+                throw new BadSymbol ((string)errorFeedback) ;
+            }
+            string? codeString = this.numberToString(errorCode);
+            this.throwExactlyMatchedException((this.exceptions != null && ((IDictionary<string, object>)this.exceptions).ContainsKey("exact") ? ((IDictionary<string, object>)this.exceptions)["exact"] : null), codeString, errorFeedback);
+            throw new ExchangeError ((string)errorFeedback) ;
         }
         string? error = this.safeString(response, "error", "");
         if (!(inOp(response, "success")) && (error == ""))

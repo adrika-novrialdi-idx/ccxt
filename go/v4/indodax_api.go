@@ -126,3 +126,68 @@ func (this *Indodax) PrivatePostCheckDownline(args ...any) <-chan any {
 func (this *Indodax) PrivatePostCreateVoucher(args ...any) <-chan any {
 	return this.Fetch2Async("createVoucher", "private", "POST", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(4)})
 }
+
+// V2GetOrder returns a channel that yields a JSON object.
+func (this *Indodax) V2GetOrder(args ...any) <-chan any {
+	return this.Fetch2Async("order", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(4)})
+}
+
+// V2GetOpenOrders returns a channel that yields a JSON array.
+func (this *Indodax) V2GetOpenOrders(args ...any) <-chan any {
+	return this.Fetch2Async("openOrders", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(4)})
+}
+
+// V2GetOrderHistories returns a channel that yields a JSON object.
+func (this *Indodax) V2GetOrderHistories(args ...any) <-chan any {
+	return this.Fetch2Async("order/histories", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(4)})
+}
+
+// V2GetMyTrades returns a channel that yields a JSON object.
+func (this *Indodax) V2GetMyTrades(args ...any) <-chan any {
+	return this.Fetch2Async("myTrades", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(4)})
+}
+
+// V2GetAccount returns a channel that yields a JSON object.
+func (this *Indodax) V2GetAccount(args ...any) <-chan any {
+	return this.Fetch2Async("account", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(4)})
+}
+
+// V2GetCapitalWithdrawHistory returns a channel that yields a JSON array.
+func (this *Indodax) V2GetCapitalWithdrawHistory(args ...any) <-chan any {
+	return this.Fetch2Async("capital/withdraw/history", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(24)})
+}
+
+// V2GetCapitalDepositHisrec returns a channel that yields a JSON array.
+func (this *Indodax) V2GetCapitalDepositHisrec(args ...any) <-chan any {
+	return this.Fetch2Async("capital/deposit/hisrec", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(24)})
+}
+
+// V2GetCapitalDepositAddressList returns a channel that yields a JSON array.
+func (this *Indodax) V2GetCapitalDepositAddressList(args ...any) <-chan any {
+	return this.Fetch2Async("capital/deposit/address/list", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(24)})
+}
+
+// V2GetFiatOrders returns a channel that yields a JSON object.
+func (this *Indodax) V2GetFiatOrders(args ...any) <-chan any {
+	return this.Fetch2Async("fiat/orders", "v2", "GET", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(24)})
+}
+
+// V2PostOrder returns a channel that yields a JSON object.
+func (this *Indodax) V2PostOrder(args ...any) <-chan any {
+	return this.Fetch2Async("order", "v2", "POST", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(4)})
+}
+
+// V2PostCapitalWithdrawApply returns a channel that yields a JSON object.
+func (this *Indodax) V2PostCapitalWithdrawApply(args ...any) <-chan any {
+	return this.Fetch2Async("capital/withdraw/apply", "v2", "POST", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(24)})
+}
+
+// V2PostFiatWithdraw returns a channel that yields a JSON object.
+func (this *Indodax) V2PostFiatWithdraw(args ...any) <-chan any {
+	return this.Fetch2Async("fiat/withdraw", "v2", "POST", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(24)})
+}
+
+// V2DeleteOrder returns a channel that yields a JSON object.
+func (this *Indodax) V2DeleteOrder(args ...any) <-chan any {
+	return this.Fetch2Async("order", "v2", "DELETE", GetArg(args, 0, nil), map[string]any{}, nil, map[string]any{"cost": float64(4)})
+}
