@@ -6,7 +6,7 @@ import Exchange from './abstract/indodax.js';
 import { ExchangeError, ArgumentsRequired, InsufficientFunds, InvalidOrder, OrderNotFound, AuthenticationError, BadSymbol, NotSupported, InvalidNonce, RateLimitExceeded, OnMaintenance, InvalidAddress } from './base/errors.js';
 import { TICK_SIZE } from './base/functions/number.js';
 import { Precise } from './base/Precise.js';
-import type{ Balances, Currency, Dict, Int, Market, Num, OHLCV, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade, Transaction, int, DepositAddress, Fee, List, NullableDict, DepositWithdrawFee, Endpoint } from './base/types.js';
+import type{ Balances, Currency, Dict, Int, Market, Num, OHLCV, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade, TradingFees, Transaction, int, DepositAddress, Fee, List, NullableDict, DepositWithdrawFee, Endpoint } from './base/types.js';
 
 //  ---------------------------------------------------------------------------
 
@@ -45,6 +45,8 @@ export default class indodax extends Exchange {
                 'createStopLimitOrder': false,
                 'createStopMarketOrder': false,
                 'createStopOrder': false,
+                'editOrder': false,
+                'fetchAccounts': false,
                 'fetchAllGreeks': false,
                 'fetchBalance': true,
                 'fetchBorrowInterest': false,
@@ -66,6 +68,7 @@ export default class indodax extends Exchange {
                 'fetchDepositWithdrawFee': true,
                 'fetchDepositWithdrawFees': false,
                 'fetchFundingHistory': false,
+                'fetchFundingLimits': false,
                 'fetchFundingInterval': false,
                 'fetchFundingIntervals': false,
                 'fetchFundingRate': false,
@@ -78,6 +81,7 @@ export default class indodax extends Exchange {
                 'fetchIsolatedPositions': false,
                 'fetchLeverage': false,
                 'fetchLeverages': false,
+                'fetchLedger': false,
                 'fetchLeverageTiers': false,
                 'fetchLiquidations': false,
                 'fetchLongShortRatio': false,
@@ -119,7 +123,8 @@ export default class indodax extends Exchange {
                 'fetchTime': true,
                 'fetchTrades': true,
                 'fetchTradingFee': false,
-                'fetchTradingFees': false,
+                'fetchTradingFees': true,
+                'fetchTradingLimits': true,
                 'fetchTransactionFee': true,
                 'fetchTransactionFees': false,
                 'fetchTransactions': 'emulated',
@@ -418,6 +423,61 @@ export default class indodax extends Exchange {
     }
 
     /**
+     * @ignore
+     * @method
+     * @name indodax#pairPriceStep
+     * @description tick size for a public pair
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {object} market raw pair from GET /api/pairs
+     * @param {string} [increment] price step from GET /api/price_increments
+     * @returns {string} tick size
+     */
+    pairPriceStep (market: Dict, increment: Str = undefined): Str {
+        if ((increment !== undefined) && (increment !== '')) {
+            return increment;
+        }
+        const pricescale = this.safeString (market, 'pricescale');
+        if (pricescale !== undefined) {
+            return pricescale;
+        }
+        const pricePrecision = this.safeString (market, 'price_precision');
+        if (pricePrecision !== undefined) {
+            return pricePrecision;
+        }
+        return this.parsePrecision (this.safeString (market, 'price_round'));
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#parsePublicTradingFee
+     * @description parse the public pair fee, which is not an account fee tier
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @param {object} market raw pair from GET /api/pairs
+     * @returns {object} a trading fee structure, or undefined when the pair has no fee fields
+     */
+    parsePublicTradingFee (market: Dict) {
+        const takerPercent = this.safeString2 (market, 'trade_fee_percent_taker', 'trade_fee_percent');
+        const makerPercent = this.safeString2 (market, 'trade_fee_percent_maker', 'trade_fee_percent');
+        if ((takerPercent === undefined) && (makerPercent === undefined)) {
+            return undefined;
+        }
+        const baseId = this.safeString (market, 'traded_currency');
+        const quoteId = this.safeString (market, 'base_currency');
+        const base = this.safeCurrencyCode (baseId);
+        const quote = this.safeCurrencyCode (quoteId);
+        return {
+            'info': market,
+            'symbol': base + '/' + quote,
+            'percentage': true,
+            'tierBased': false,
+            'maker': this.parseNumber (Precise.stringDiv (makerPercent, '100')),
+            'taker': this.parseNumber (Precise.stringDiv (takerPercent, '100')),
+        };
+    }
+
+    /**
      * @method
      * @name indodax#fetchMarkets
      * @description retrieves data on all markets for indodax
@@ -441,12 +501,15 @@ export default class indodax extends Exchange {
         //             "price_precision": 1000,
         //             "price_round": 8,
         //             "pricescale": 1000,
+        //             "quantity_increment": "0.00000001",
         //             "trade_min_base_currency": 10000,
         //             "trade_min_traded_currency": 0.00007457,
         //             "has_memo": false,
         //             "memo_name": false,
         //             "has_payment_id": false,
         //             "trade_fee_percent": 0.3,
+        //             "trade_fee_percent_maker": 0.1,
+        //             "trade_fee_percent_taker": 0.2,
         //             "url_logo": "https://indodax.com/v2/logo/svg/color/btc.svg",
         //             "url_logo_png": "https://indodax.com/v2/logo/png/color/btc.png",
         //             "is_maintenance": 0
@@ -464,6 +527,8 @@ export default class indodax extends Exchange {
             const quote = this.safeCurrencyCode (quoteId);
             const isMaintenance = this.safeInteger (market, 'is_maintenance');
             const inMaintenance = (isMaintenance !== undefined) && (isMaintenance !== 0);
+            const fee = this.parsePublicTradingFee (market);
+            const amountStep = this.safeString (market, 'quantity_increment', '0.00000001');
             result.push ({
                 'id': id,
                 'symbol': base + '/' + quote,
@@ -483,16 +548,18 @@ export default class indodax extends Exchange {
                 'contract': false,
                 'linear': undefined,
                 'inverse': undefined,
-                'taker': this.safeNumber (market, 'trade_fee_percent'),
+                'taker': (fee === undefined) ? undefined : fee['taker'],
+                'maker': (fee === undefined) ? undefined : fee['maker'],
                 'contractSize': undefined,
                 'expiry': undefined,
                 'expiryDatetime': undefined,
                 'strike': undefined,
                 'optionType': undefined,
                 'percentage': true,
+                'tierBased': false,
                 'precision': {
-                    'amount': this.parseNumber ('1e-8'),
-                    'price': this.parseNumber (this.parsePrecision (this.safeString (market, 'price_round'))),
+                    'amount': this.parseNumber (amountStep),
+                    'price': this.parseNumber (this.pairPriceStep (market)),
                     'cost': this.parseNumber (this.parsePrecision (this.safeString (market, 'volume_precision'))),
                 },
                 'limits': {
@@ -505,11 +572,11 @@ export default class indodax extends Exchange {
                         'max': undefined,
                     },
                     'price': {
-                        'min': this.safeNumber (market, 'trade_min_base_currency'),
+                        'min': undefined,
                         'max': undefined,
                     },
                     'cost': {
-                        'min': undefined,
+                        'min': this.safeNumber (market, 'trade_min_base_currency'),
                         'max': undefined,
                     },
                 },
@@ -518,6 +585,120 @@ export default class indodax extends Exchange {
             });
         }
         return result;
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchTradingFees
+     * @description fetch the public trading fees for multiple markets
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a dictionary of [fee structures]{@link https://docs.ccxt.com/?id=trading-fee-structure} indexed by market symbols
+     */
+    override async fetchTradingFees (params: Dict = {}): Promise<TradingFees> {
+        const response = await this.publicGetApiPairs (params);
+        const rawMarkets = this.toArray (response);
+        const result: Dict = {};
+        for (let i = 0; i < rawMarkets.length; i++) {
+            const fee = this.parsePublicTradingFee (rawMarkets[i]);
+            if (fee !== undefined) {
+                const symbol = this.safeString (fee, 'symbol');
+                if (symbol !== undefined) {
+                    result[symbol] = fee;
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchTradingLimits
+     * @description fetch the public trading limits and price steps for markets
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {string[]|undefined} symbols unified market symbols
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a dictionary of [trading limits structures]{@link https://docs.ccxt.com/?id=trading-limits-structure} indexed by market symbol
+     */
+    override async fetchTradingLimits (symbols: Strings = undefined, params: Dict = {}): Promise<Dict> {
+        const response = await this.publicGetApiPairs (params);
+        const incrementsResponse = await this.publicGetApiPriceIncrements (params);
+        const increments = this.safeDict (incrementsResponse, 'increments', {});
+        const rawMarkets = this.toArray (response);
+        const result: Dict = {};
+        for (let i = 0; i < rawMarkets.length; i++) {
+            const market = rawMarkets[i];
+            const baseId = this.safeString (market, 'traded_currency');
+            const quoteId = this.safeString (market, 'base_currency');
+            const base = this.safeCurrencyCode (baseId);
+            const quote = this.safeCurrencyCode (quoteId);
+            const symbol = base + '/' + quote;
+            if (symbols !== undefined) {
+                if (!this.inArray (symbol, symbols)) {
+                    continue;
+                }
+            }
+            const tickerId = this.safeString (market, 'ticker_id');
+            let priceStep = this.safeString (increments, tickerId);
+            if (priceStep === undefined) {
+                priceStep = this.safeString (increments, this.safeString (market, 'id'));
+            }
+            const amountStep = this.safeString (market, 'quantity_increment');
+            result[symbol] = {
+                'info': market,
+                'precision': {
+                    'amount': this.parseNumber (amountStep),
+                    'price': this.parseNumber (this.pairPriceStep (market, priceStep)),
+                },
+                'limits': {
+                    'amount': {
+                        'min': this.safeNumber (market, 'trade_min_traded_currency'),
+                        'max': undefined,
+                    },
+                    'price': {
+                        'min': undefined,
+                        'max': undefined,
+                    },
+                    'cost': {
+                        'min': this.safeNumber (market, 'trade_min_base_currency'),
+                        'max': undefined,
+                    },
+                },
+            };
+        }
+        return result;
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchFundingLimits
+     * @description fetch the deposit and withdrawal limits for a currency
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md
+     * @param {string[]|undefined} codes unified currency codes
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [funding limits structure]{@link https://docs.ccxt.com/?id=funding-limits-structure}
+     */
+    async fetchFundingLimits (codes: Strings = undefined, params: Dict = {}): Promise<Dict> {
+        throw new NotSupported (this.id + ' fetchFundingLimits() is not supported yet');
+    }
+
+    /**
+     * @method
+     * @name indodax#editOrder
+     * @description edit a trade order
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
+     * @param {string} id order id
+     * @param {string} symbol unified symbol of the market to edit an order in
+     * @param {string} type 'market' or 'limit'
+     * @param {string} side 'buy' or 'sell'
+     * @param {float} [amount] how much of the currency you want to trade in units of the base currency
+     * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    override async editOrder (id: string, symbol: string, type: OrderType, side: OrderSide, amount: Num = undefined, price: Num = undefined, params: Dict = {}): Promise<Order> {
+        throw new NotSupported (this.id + ' editOrder() is not supported yet');
     }
 
     override parseBalance (response: any): Balances {
@@ -1570,6 +1751,30 @@ export default class indodax extends Exchange {
 
     /**
      * @method
+     * @name indodax#fetchDepositAddress
+     * @description fetch the deposit address for a currency associated with this account
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+     * @param {string} code unified currency code
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
+     * @returns {object} an [address structure]{@link https://docs.ccxt.com/?id=address-structure}
+     */
+    override async fetchDepositAddress (code: string, params: Dict = {}): Promise<DepositAddress> {
+        const addresses = await this.fetchDepositAddresses ([ code ], params);
+        const rows = this.toArray (addresses);
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowCode = this.safeString (row, 'currency');
+            if (rowCode === code) {
+                return row as DepositAddress;
+            }
+        }
+        throw new InvalidAddress (this.id + ' fetchDepositAddress() could not find a deposit address for ' + code + ', make sure you have created a corresponding deposit address in your wallet on the exchange website');
+    }
+
+    /**
+     * @method
      * @name indodax#fetchDepositAddresses
      * @description fetch deposit addresses for multiple currencies and chain types
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
@@ -1626,9 +1831,7 @@ export default class indodax extends Exchange {
         const addresses = this.safeDict (data, 'address', {});
         const networks = this.safeDict (data, 'network', {});
         const addressKeys = Object.keys (addresses);
-        const result: Dict = {
-            'info': data,
-        };
+        const result = [];
         for (let i = 0; i < addressKeys.length; i++) {
             const marketId = addressKeys[i];
             const code = this.safeCurrencyCode (marketId);
@@ -1662,13 +1865,13 @@ export default class indodax extends Exchange {
                 }
                 const finalNetwork = network; // java req
                 if (code !== undefined) {
-                    result[code] = {
+                    result.push ({
                         'info': {},
                         'currency': code,
                         'network': finalNetwork,
                         'address': address,
                         'tag': undefined,
-                    };
+                    });
                 }
             }
         }
@@ -2177,7 +2380,7 @@ export default class indodax extends Exchange {
      * @name indodax#depositAddressesV2
      * @param {string[]} [codes] unified currency codes
      * @param {object} [params] extra parameters
-     * @returns {object} a dictionary of address structures
+     * @returns {object[]} a list of address structures
      */
     async depositAddressesV2 (codes: Strings = undefined, params: Dict = {}): Promise<DepositAddress[]> {
         if (this.markets === undefined) {
@@ -2186,9 +2389,7 @@ export default class indodax extends Exchange {
         let networkCode: Str = undefined;
         [ networkCode, params ] = this.handleNetworkCodeAndParams (params);
         const currencyCodes = this.v2CurrencyCodes (codes);
-        const result: Dict = {
-            'info': [],
-        };
+        const result = [];
         for (let i = 0; i < currencyCodes.length; i++) {
             const code = currencyCodes[i];
             const currency = this.currency (code);
@@ -2200,11 +2401,6 @@ export default class indodax extends Exchange {
             }
             const response = await this.v2GetCapitalDepositAddressList (this.extend (request, params));
             const rows = this.toArray (response);
-            const info = this.safeList (result, 'info', []);
-            for (let j = 0; j < rows.length; j++) {
-                info.push (rows[j]);
-            }
-            result['info'] = info;
             if (rows.length < 1) {
                 continue;
             }
@@ -2214,13 +2410,16 @@ export default class indodax extends Exchange {
                 this.checkAddress (address);
             }
             const networkId = this.safeString (row, 'network');
-            result[currency['code']] = {
-                'info': row,
-                'currency': currency['code'],
-                'network': this.networkIdToCode (networkId, currency['code']),
-                'address': address,
-                'tag': this.safeString (row, 'tag'),
-            };
+            const currencyCode = this.safeString (currency, 'code');
+            if (currencyCode !== undefined) {
+                result.push ({
+                    'info': row,
+                    'currency': currencyCode,
+                    'network': this.networkIdToCode (networkId, currencyCode),
+                    'address': address,
+                    'tag': this.safeString (row, 'tag'),
+                });
+            }
         }
         return result as DepositAddress[];
     }
