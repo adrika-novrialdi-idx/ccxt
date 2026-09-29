@@ -68,9 +68,9 @@ export default class indodax extends Exchange {
                 'fetchDepositWithdrawFee': true,
                 'fetchDepositWithdrawFees': false,
                 'fetchFundingHistory': false,
-                'fetchFundingLimits': false,
                 'fetchFundingInterval': false,
                 'fetchFundingIntervals': false,
+                'fetchFundingLimits': false,
                 'fetchFundingRate': false,
                 'fetchFundingRateHistory': false,
                 'fetchFundingRates': false,
@@ -79,9 +79,9 @@ export default class indodax extends Exchange {
                 'fetchIsolatedBorrowRate': false,
                 'fetchIsolatedBorrowRates': false,
                 'fetchIsolatedPositions': false,
+                'fetchLedger': false,
                 'fetchLeverage': false,
                 'fetchLeverages': false,
-                'fetchLedger': false,
                 'fetchLeverageTiers': false,
                 'fetchLiquidations': false,
                 'fetchLongShortRatio': false,
@@ -526,7 +526,17 @@ export default class indodax extends Exchange {
             const quote = this.safeCurrencyCode (quoteId);
             const isMaintenance = this.safeInteger (market, 'is_maintenance');
             const inMaintenance = (isMaintenance !== undefined) && (isMaintenance !== 0);
+            let active = true;
+            if (inMaintenance) {
+                active = false;
+            }
             const fee = this.parsePublicTradingFee (market);
+            let taker = undefined;
+            let maker = undefined;
+            if (fee !== undefined) {
+                taker = fee['taker'];
+                maker = fee['maker'];
+            }
             const amountStep = this.safeString (market, 'quantity_increment', '0.00000001');
             result.push ({
                 'id': id,
@@ -543,12 +553,12 @@ export default class indodax extends Exchange {
                 'swap': false,
                 'future': false,
                 'option': false,
-                'active': inMaintenance ? false : true,
+                'active': active,
                 'contract': false,
                 'linear': undefined,
                 'inverse': undefined,
-                'taker': (fee === undefined) ? undefined : fee['taker'],
-                'maker': (fee === undefined) ? undefined : fee['maker'],
+                'taker': taker,
+                'maker': maker,
                 'contractSize': undefined,
                 'expiry': undefined,
                 'expiryDatetime': undefined,
