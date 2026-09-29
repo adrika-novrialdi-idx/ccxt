@@ -404,6 +404,51 @@ export default class indodax extends Exchange {
     }
 
     /**
+     * @ignore
+     * @method
+     * @name indodax#v1PairId
+     * @description TAPI v1 pair id, which is ticker_id rather than the public pair id
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md
+     * @param {object} market unified market
+     * @returns {string} pair id such as btc_idr
+     */
+    v1PairId (market: Market): string {
+        const info = this.safeDict (market, 'info', {});
+        const tickerId = this.safeString (info, 'ticker_id');
+        if (tickerId !== undefined) {
+            return tickerId;
+        }
+        return this.safeString (market, 'id', '');
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#marketFromV1Pair
+     * @description find a market for a TAPI v1 pair id such as btc_idr
+     * @param {string} pairId pair id from an order or the open-orders map
+     * @returns {object} a market structure
+     */
+    marketFromV1Pair (pairId: Str): Market {
+        if ((pairId !== undefined) && (this.markets_by_id !== undefined) && (pairId in this.markets_by_id)) {
+            return this.safeMarket (pairId);
+        }
+        const marketList = this.toArray (this.markets);
+        for (let i = 0; i < marketList.length; i++) {
+            const entry = marketList[i];
+            const info = this.safeDict (entry, 'info', {});
+            const tickerId = this.safeString (info, 'ticker_id');
+            if ((tickerId !== undefined) && (tickerId === pairId)) {
+                return entry;
+            }
+        }
+        if ((pairId !== undefined) && (pairId.indexOf ('_') >= 0)) {
+            return this.safeMarket (pairId, undefined, '_');
+        }
+        return this.safeMarket (pairId);
+    }
+
+    /**
      * @method
      * @name indodax#fetchTime
      * @description fetches the current integer timestamp in milliseconds from the exchange server
@@ -451,6 +496,25 @@ export default class indodax extends Exchange {
     /**
      * @ignore
      * @method
+     * @name indodax#pairIncrement
+     * @description price step from GET /api/price_increments for one raw pair
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {object} market raw pair from GET /api/pairs
+     * @param {object} increments map from GET /api/price_increments
+     * @returns {string|undefined} tick size
+     */
+    pairIncrement (market: Dict, increments: Dict): Str {
+        const tickerId = this.safeString (market, 'ticker_id');
+        let priceStep = this.safeString (increments, tickerId);
+        if (priceStep === undefined) {
+            priceStep = this.safeString (increments, this.safeString (market, 'id'));
+        }
+        return priceStep;
+    }
+
+    /**
+     * @ignore
+     * @method
      * @name indodax#parsePublicTradingFee
      * @description parse the public pair fee, which is not an account fee tier
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
@@ -482,11 +546,14 @@ export default class indodax extends Exchange {
      * @name indodax#fetchMarkets
      * @description retrieves data on all markets for indodax
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @returns {object[]} an array of objects representing market data
      */
     override async fetchMarkets (params: Dict = {}): Promise<Market[]> {
         const response = await this.publicGetApiPairs (params);
+        const incrementsResponse = await this.publicGetApiPriceIncrements (params);
+        const increments = this.safeDict (incrementsResponse, 'increments', {});
         //
         //     [
         //         {
@@ -539,6 +606,7 @@ export default class indodax extends Exchange {
                 maker = fee['maker'];
             }
             const amountStep = this.safeString (market, 'quantity_increment', '0.00000001');
+            const priceStep = this.pairIncrement (market, increments);
             result.push ({
                 'id': id,
                 'symbol': base + '/' + quote,
@@ -569,7 +637,7 @@ export default class indodax extends Exchange {
                 'tierBased': false,
                 'precision': {
                     'amount': this.parseNumber (amountStep),
-                    'price': this.parseNumber (this.pairPriceStep (market)),
+                    'price': this.parseNumber (this.pairPriceStep (market, priceStep)),
                     'cost': this.parseNumber (this.parsePrecision (this.safeString (market, 'volume_precision'))),
                 },
                 'limits': {
@@ -649,11 +717,7 @@ export default class indodax extends Exchange {
                     continue;
                 }
             }
-            const tickerId = this.safeString (market, 'ticker_id');
-            let priceStep = this.safeString (increments, tickerId);
-            if (priceStep === undefined) {
-                priceStep = this.safeString (increments, this.safeString (market, 'id'));
-            }
+            const priceStep = this.pairIncrement (market, increments);
             const amountStep = this.safeString (market, 'quantity_increment');
             result[symbol] = {
                 'info': market,
@@ -1123,20 +1187,40 @@ export default class indodax extends Exchange {
         market = this.safeMarket (marketId, market);
         if (market !== undefined) {
             symbol = market['symbol'];
-            let quoteId = market['quoteId'];
-            let baseId = market['baseId'];
-            if ((market['quoteId'] === 'idr') && ('order_rp' in order)) {
+            let quoteId = this.safeString (market, 'quoteId');
+            let baseId = this.safeString (market, 'baseId');
+            if ((quoteId === undefined) || (baseId === undefined)) {
+                const resolved = this.marketFromV1Pair (marketId);
+                const resolvedQuoteId = this.safeString (resolved, 'quoteId');
+                const resolvedBaseId = this.safeString (resolved, 'baseId');
+                if (resolvedQuoteId !== undefined) {
+                    quoteId = resolvedQuoteId;
+                    symbol = this.safeString (resolved, 'symbol', symbol);
+                }
+                if (resolvedBaseId !== undefined) {
+                    baseId = resolvedBaseId;
+                }
+            }
+            if ((quoteId === 'idr') && ('order_rp' in order)) {
                 quoteId = 'rp';
             }
-            if ((market['baseId'] === 'idr') && ('remain_rp' in order)) {
+            if ((baseId === 'idr') && ('remain_rp' in order)) {
                 baseId = 'rp';
             }
-            cost = this.safeString (order, 'order_' + quoteId);
-            amount = this.safeString (order, 'order_' + baseId);
-            remaining = this.safeString (order, 'remain_' + baseId);
-            // filled buy orders on idr-quoted markets carry the executed base amount
-            // only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
-            filled = this.safeString (order, 'receive_' + baseId);
+            if (quoteId !== undefined) {
+                const costKey = 'order_' + quoteId;
+                cost = this.safeString (order, costKey);
+            }
+            if (baseId !== undefined) {
+                const amountKey = 'order_' + baseId;
+                const remainKey = 'remain_' + baseId;
+                const filledKey = 'receive_' + baseId;
+                amount = this.safeString (order, amountKey);
+                remaining = this.safeString (order, remainKey);
+                // filled buy orders on idr-quoted markets carry the executed base amount
+                // only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
+                filled = this.safeString (order, filledKey);
+            }
         }
         const timestamp = this.safeInteger (order, 'submit_time');
         const fee = undefined;
@@ -1190,7 +1274,7 @@ export default class indodax extends Exchange {
         }
         const market = this.market (symbol);
         const request: Dict = {
-            'pair': market['id'],
+            'pair': this.v1PairId (market),
             'order_id': id,
         };
         const response = await this.privatePostGetOrder (this.extend (request, params));
@@ -1223,7 +1307,7 @@ export default class indodax extends Exchange {
         const request: Dict = {};
         if (symbol !== undefined) {
             market = this.market (symbol);
-            request['pair'] = market['id'];
+            request['pair'] = this.v1PairId (market);
         }
         const response = await this.privatePostOpenOrders (this.extend (request, params));
         const openOrdersResult = this.safeDict (response, 'return', {});
@@ -1242,7 +1326,7 @@ export default class indodax extends Exchange {
         for (let i = 0; i < marketIds.length; i++) {
             const marketId = marketIds[i];
             const marketOrders = rawOrders[marketId];
-            market = this.safeMarket (marketId);
+            market = this.marketFromV1Pair (marketId);
             const parsedOrders = this.parseOrders (marketOrders, market, since, limit);
             exchangeOrders = this.arrayConcat (exchangeOrders, parsedOrders);
         }
@@ -1274,7 +1358,7 @@ export default class indodax extends Exchange {
         }
         const market = this.market (symbol);
         const request: Dict = {
-            'pair': market['id'],
+            'pair': this.v1PairId (market),
         };
         const response = await this.privatePostOrderHistory (this.extend (request, params));
         const historyResult = this.safeDict (response, 'return', {});
@@ -1310,7 +1394,7 @@ export default class indodax extends Exchange {
         }
         const market = this.market (symbol);
         const request: Dict = {
-            'pair': market['id'],
+            'pair': this.v1PairId (market),
             'type': side,
             'price': price,
         };
@@ -1391,7 +1475,7 @@ export default class indodax extends Exchange {
         const market = this.market (symbol);
         const request: Dict = {
             'order_id': id,
-            'pair': market['id'],
+            'pair': this.v1PairId (market),
             'type': side,
         };
         const response = await this.privatePostCancelOrder (this.extend (request, params));
@@ -1760,6 +1844,56 @@ export default class indodax extends Exchange {
     }
 
     /**
+     * @ignore
+     * @method
+     * @name indodax#v1DepositNetwork
+     * @description parse a getInfo network value, which may be a string, a comma-separated string, a list, or empty
+     * @param {object} networks network map from getInfo
+     * @param {string} currencyId currency id key
+     * @param {string} code unified currency code
+     * @returns {string|string[]|undefined} unified network code or a list of them
+     */
+    v1DepositNetwork (networks: Dict, currencyId: string, code: Str) {
+        const networkList = this.safeList (networks, currencyId);
+        const networkIds = [];
+        if (networkList !== undefined) {
+            for (let i = 0; i < networkList.length; i++) {
+                const networkId = this.safeString (networkList, i);
+                if (networkId !== undefined) {
+                    networkIds.push (networkId);
+                }
+            }
+        } else {
+            const networkId = this.safeString (networks, currencyId);
+            if (networkId !== undefined) {
+                if (networkId.indexOf (',') >= 0) {
+                    const parts = networkId.split (',');
+                    for (let j = 0; j < parts.length; j++) {
+                        networkIds.push (parts[j]);
+                    }
+                } else {
+                    networkIds.push (networkId);
+                }
+            }
+        }
+        const parsed = [];
+        for (let i = 0; i < networkIds.length; i++) {
+            const networkCode = this.networkIdToCode (networkIds[i], code);
+            if (networkCode !== undefined) {
+                parsed.push (networkCode.toUpperCase ());
+            }
+        }
+        const parsedCount = parsed.length;
+        if (parsedCount < 1) {
+            return undefined;
+        }
+        if (parsedCount === 1) {
+            return parsed[0];
+        }
+        return parsed;
+    }
+
+    /**
      * @method
      * @name indodax#fetchDepositAddress
      * @description fetch the deposit address for a currency associated with this account
@@ -1848,31 +1982,7 @@ export default class indodax extends Exchange {
             const address = this.safeString (addresses, marketId);
             if ((address !== undefined) && ((codes === undefined) || (this.inArray (code, codes)))) {
                 this.checkAddress (address);
-                let network: Str | string[] = undefined;
-                if (marketId in networks) {
-                    const networkId = this.safeString (networks, marketId);
-                    if (networkId === undefined) {
-                        throw new ExchangeError (this.id + ' fetchDepositAddresses() missing networkId');
-                    }
-                    if (networkId.indexOf (',') >= 0) {
-                        network = [];
-                        if (networkId === undefined) {
-                            throw new ExchangeError (this.id + ' fetchDepositAddresses() missing networkId');
-                        }
-                        const networkIds = networkId.split (',');
-                        for (let j = 0; j < networkIds.length; j++) {
-                            const _netIdTmp = this.networkIdToCode (networkIds[j], code);
-                            if (_netIdTmp !== undefined) {
-                                network.push (_netIdTmp.toUpperCase ());
-                            }
-                        }
-                    } else {
-                        const _netIdTmp = this.networkIdToCode (networkId, code);
-                        if (_netIdTmp !== undefined) {
-                            network = _netIdTmp.toUpperCase ();
-                        }
-                    }
-                }
+                const network = this.v1DepositNetwork (networks, marketId, code);
                 const finalNetwork = network; // java req
                 if (code !== undefined) {
                     result.push ({
