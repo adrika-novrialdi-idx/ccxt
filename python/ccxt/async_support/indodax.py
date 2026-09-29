@@ -406,6 +406,42 @@ class indodax(Exchange, ImplicitAPI):
         marketId = marketId.replace('_', '')
         return marketId.lower()
 
+    def v1_pair_id(self, market: Market) -> str:
+        """
+ @ignore
+        TAPI v1 pair id, which is ticker_id rather than the public pair id
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md
+
+        :param dict market: unified market
+        :returns str: pair id such as btc_idr
+        """
+        info = self.safe_dict(market, 'info', {})
+        tickerId = self.safe_string(info, 'ticker_id')
+        if tickerId is not None:
+            return tickerId
+        return self.safe_string(market, 'id', '')
+
+    def market_from_v1_pair(self, pairId: Str) -> Market:
+        """
+ @ignore
+        find a market for a TAPI v1 pair id such as btc_idr
+        :param str pairId: pair id from an order or the open-orders map
+        :returns dict: a market structure
+        """
+        if (pairId is not None) and (self.markets_by_id is not None) and (pairId in self.markets_by_id):
+            return self.safe_market(pairId)
+        marketList = self.to_array(self.markets)
+        for i in range(0, len(marketList)):
+            entry = marketList[i]
+            info = self.safe_dict(entry, 'info', {})
+            tickerId = self.safe_string(info, 'ticker_id')
+            if (tickerId is not None) and (tickerId == pairId):
+                return entry
+        if (pairId is not None) and (pairId.find('_') >= 0):
+            return self.safe_market(pairId, None, '_')
+        return self.safe_market(pairId)
+
     async def fetch_time(self, params: dict = {}) -> Int:
         """
         fetches the current integer timestamp in milliseconds from the exchange server
@@ -446,6 +482,23 @@ class indodax(Exchange, ImplicitAPI):
             return pricePrecision
         return self.parse_precision(self.safe_string(market, 'price_round'))
 
+    def pair_increment(self, market: dict, increments: dict) -> Str:
+        """
+ @ignore
+        price step from GET /api/price_increments for one raw pair
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+
+        :param dict market: raw pair from GET /api/pairs
+        :param dict increments: map from GET /api/price_increments
+        :returns str|None: tick size
+        """
+        tickerId = self.safe_string(market, 'ticker_id')
+        priceStep = self.safe_string(increments, tickerId)
+        if priceStep is None:
+            priceStep = self.safe_string(increments, self.safe_string(market, 'id'))
+        return priceStep
+
     def parse_public_trading_fee(self, market: dict):
         """
  @ignore
@@ -478,11 +531,14 @@ class indodax(Exchange, ImplicitAPI):
         retrieves data on all markets for indodax
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
 
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :returns dict[]: an array of objects representing market data
         """
         response = await self.publicGetApiPairs(params)
+        incrementsResponse = await self.publicGetApiPriceIncrements(params)
+        increments = self.safe_dict(incrementsResponse, 'increments', {})
         #
         #     [
         #         {
@@ -533,6 +589,7 @@ class indodax(Exchange, ImplicitAPI):
                 taker = fee['taker']
                 maker = fee['maker']
             amountStep = self.safe_string(market, 'quantity_increment', '0.00000001')
+            priceStep = self.pair_increment(market, increments)
             result.append({
                 'id': id,
                 'symbol': base + '/' + quote,
@@ -563,7 +620,7 @@ class indodax(Exchange, ImplicitAPI):
                 'tierBased': False,
                 'precision': {
                     'amount': self.parse_number(amountStep),
-                    'price': self.parse_number(self.pair_price_step(market)),
+                    'price': self.parse_number(self.pair_price_step(market, priceStep)),
                     'cost': self.parse_number(self.parse_precision(self.safe_string(market, 'volume_precision'))),
                 },
                 'limits': {
@@ -635,10 +692,7 @@ class indodax(Exchange, ImplicitAPI):
             if symbols is not None:
                 if not self.in_array(symbol, symbols):
                     continue
-            tickerId = self.safe_string(market, 'ticker_id')
-            priceStep = self.safe_string(increments, tickerId)
-            if priceStep is None:
-                priceStep = self.safe_string(increments, self.safe_string(market, 'id'))
+            priceStep = self.pair_increment(market, increments)
             amountStep = self.safe_string(market, 'quantity_increment')
             result[symbol] = {
                 'info': market,
@@ -1076,18 +1130,33 @@ class indodax(Exchange, ImplicitAPI):
         market = self.safe_market(marketId, market)
         if market is not None:
             symbol = market['symbol']
-            quoteId = market['quoteId']
-            baseId = market['baseId']
-            if (market['quoteId'] == 'idr') and ('order_rp' in order):
+            quoteId = self.safe_string(market, 'quoteId')
+            baseId = self.safe_string(market, 'baseId')
+            if (quoteId is None) or (baseId is None):
+                resolved = self.market_from_v1_pair(marketId)
+                resolvedQuoteId = self.safe_string(resolved, 'quoteId')
+                resolvedBaseId = self.safe_string(resolved, 'baseId')
+                if resolvedQuoteId is not None:
+                    quoteId = resolvedQuoteId
+                    symbol = self.safe_string(resolved, 'symbol', symbol)
+                if resolvedBaseId is not None:
+                    baseId = resolvedBaseId
+            if (quoteId == 'idr') and ('order_rp' in order):
                 quoteId = 'rp'
-            if (market['baseId'] == 'idr') and ('remain_rp' in order):
+            if (baseId == 'idr') and ('remain_rp' in order):
                 baseId = 'rp'
-            cost = self.safe_string(order, 'order_' + quoteId)
-            amount = self.safe_string(order, 'order_' + baseId)
-            remaining = self.safe_string(order, 'remain_' + baseId)
-            # filled buy orders on idr-quoted markets carry the executed base amount
-            # only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
-            filled = self.safe_string(order, 'receive_' + baseId)
+            if quoteId is not None:
+                costKey = 'order_' + quoteId
+                cost = self.safe_string(order, costKey)
+            if baseId is not None:
+                amountKey = 'order_' + baseId
+                remainKey = 'remain_' + baseId
+                filledKey = 'receive_' + baseId
+                amount = self.safe_string(order, amountKey)
+                remaining = self.safe_string(order, remainKey)
+                # filled buy orders on idr-quoted markets carry the executed base amount
+                # only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
+                filled = self.safe_string(order, filledKey)
         timestamp = self.safe_integer(order, 'submit_time')
         fee = None
         id = self.safe_string(order, 'order_id')
@@ -1136,7 +1205,7 @@ class indodax(Exchange, ImplicitAPI):
             await self.load_markets()
         market = self.market(symbol)
         request = {
-            'pair': market['id'],
+            'pair': self.v1_pair_id(market),
             'order_id': id,
         }
         response = await self.privatePostGetOrder(self.extend(request, params))
@@ -1166,7 +1235,7 @@ class indodax(Exchange, ImplicitAPI):
         request = {}
         if symbol is not None:
             market = self.market(symbol)
-            request['pair'] = market['id']
+            request['pair'] = self.v1_pair_id(market)
         response = await self.privatePostOpenOrders(self.extend(request, params))
         openOrdersResult = self.safe_dict(response, 'return', {})
         rawOrders = openOrdersResult['orders']
@@ -1182,7 +1251,7 @@ class indodax(Exchange, ImplicitAPI):
         for i in range(0, len(marketIds)):
             marketId = marketIds[i]
             marketOrders = rawOrders[marketId]
-            market = self.safe_market(marketId)
+            market = self.market_from_v1_pair(marketId)
             parsedOrders = self.parse_orders(marketOrders, market, since, limit)
             exchangeOrders = self.array_concat(exchangeOrders, parsedOrders)
         return exchangeOrders
@@ -1209,7 +1278,7 @@ class indodax(Exchange, ImplicitAPI):
             await self.load_markets()
         market = self.market(symbol)
         request = {
-            'pair': market['id'],
+            'pair': self.v1_pair_id(market),
         }
         response = await self.privatePostOrderHistory(self.extend(request, params))
         historyResult = self.safe_dict(response, 'return', {})
@@ -1242,7 +1311,7 @@ class indodax(Exchange, ImplicitAPI):
             await self.load_markets()
         market = self.market(symbol)
         request = {
-            'pair': market['id'],
+            'pair': self.v1_pair_id(market),
             'type': side,
             'price': price,
         }
@@ -1310,7 +1379,7 @@ class indodax(Exchange, ImplicitAPI):
         market = self.market(symbol)
         request = {
             'order_id': id,
-            'pair': market['id'],
+            'pair': self.v1_pair_id(market),
             'type': side,
         }
         response = await self.privatePostCancelOrder(self.extend(request, params))
@@ -1657,6 +1726,43 @@ class indodax(Exchange, ImplicitAPI):
         }
         return self.safe_string(statuses, status, status)
 
+    def v1_deposit_network(self, networks: dict, currencyId: str, code: Str):
+        """
+ @ignore
+        parse a getInfo network value, which may be a string, a comma-separated string, a list, or empty
+        :param dict networks: network map from getInfo
+        :param str currencyId: currency id key
+        :param str code: unified currency code
+        :returns string|str[]|None: unified network code or a list of them
+        """
+        networkList = self.safe_list(networks, currencyId)
+        networkIds = []
+        if networkList is not None:
+            for i in range(0, len(networkList)):
+                networkId = self.safe_string(networkList, i)
+                if networkId is not None:
+                    networkIds.append(networkId)
+        else:
+            networkId = self.safe_string(networks, currencyId)
+            if networkId is not None:
+                if networkId.find(',') >= 0:
+                    parts = networkId.split(',')
+                    for j in range(0, len(parts)):
+                        networkIds.append(parts[j])
+                else:
+                    networkIds.append(networkId)
+        parsed = []
+        for i in range(0, len(networkIds)):
+            networkCode = self.network_id_to_code(networkIds[i], code)
+            if networkCode is not None:
+                parsed.append(networkCode.upper())
+        parsedCount = len(parsed)
+        if parsedCount < 1:
+            return None
+        if parsedCount == 1:
+            return parsed[0]
+        return parsed
+
     async def fetch_deposit_address(self, code: str, params: dict = {}) -> DepositAddress:
         """
         fetch the deposit address for a currency associated with self account
@@ -1741,24 +1847,7 @@ class indodax(Exchange, ImplicitAPI):
             address = self.safe_string(addresses, marketId)
             if (address is not None) and ((codes is None) or (self.in_array(code, codes))):
                 self.check_address(address)
-                network = None
-                if marketId in networks:
-                    networkId = self.safe_string(networks, marketId)
-                    if networkId is None:
-                        raise ExchangeError(self.id + ' fetchDepositAddresses() missing networkId')
-                    if networkId.find(',') >= 0:
-                        network = []
-                        if networkId is None:
-                            raise ExchangeError(self.id + ' fetchDepositAddresses() missing networkId')
-                        networkIds = networkId.split(',')
-                        for j in range(0, len(networkIds)):
-                            _netIdTmp = self.network_id_to_code(networkIds[j], code)
-                            if _netIdTmp is not None:
-                                network.append(_netIdTmp.upper())
-                    else:
-                        _netIdTmp = self.network_id_to_code(networkId, code)
-                        if _netIdTmp is not None:
-                            network = _netIdTmp.upper()
+                network = self.v1_deposit_network(networks, marketId, code)
                 finalNetwork = network  # java req
                 if code is not None:
                     result.append({

@@ -464,6 +464,56 @@ func (this *Indodax) TapiV2Symbol(market any) any {
 }
 
 /**
+ * @ignore
+ * @method
+ * @name indodax#v1PairId
+ * @description TAPI v1 pair id, which is ticker_id rather than the public pair id
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md
+ * @param {object} market unified market
+ * @returns {string} pair id such as btc_idr
+ */
+func (this *Indodax) V1PairId(market any) any {
+	var info map[string]any = SafeMapTyped(market, "info")
+	var tickerId *string = this.SafeString(info, "ticker_id")
+	if tickerId != nil {
+		return tickerId
+	}
+	return this.SafeString(market, "id", "")
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#marketFromV1Pair
+ * @description find a market for a TAPI v1 pair id such as btc_idr
+ * @param {string} pairId pair id from an order or the open-orders map
+ * @returns {object} a market structure
+ */
+func (this *Indodax) MarketFromV1Pair(pairId any) any {
+	if (!IsEqual(pairId, nil)) && (this.Markets_by_id != nil) && (InOp(this.Markets_by_id, pairId)) {
+		return this.SafeMarket(pairId)
+	}
+	var marketList []any = this.ToArray(this.Markets)
+	for i := 0; i < len(marketList); i++ {
+		var entry any = func() any {
+			if i >= 0 && i < len(marketList) {
+				return DerefScalar(marketList[i])
+			}
+			return nil
+		}()
+		var info map[string]any = SafeMapTyped(entry, "info")
+		var tickerId *string = this.SafeString(info, "ticker_id")
+		if (tickerId != nil) && (IsEqual(tickerId, pairId)) {
+			return entry
+		}
+	}
+	if (!IsEqual(pairId, nil)) && (GetIndexOf(pairId, "_") >= 0) {
+		return this.SafeMarket(pairId, nil, "_")
+	}
+	return this.SafeMarket(pairId)
+}
+
+/**
  * @method
  * @name indodax#fetchTime
  * @description fetches the current integer timestamp in milliseconds from the exchange server
@@ -526,6 +576,25 @@ func (this *Indodax) PairPriceStep(market any, optionalArgs ...any) any {
 /**
  * @ignore
  * @method
+ * @name indodax#pairIncrement
+ * @description price step from GET /api/price_increments for one raw pair
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+ * @param {object} market raw pair from GET /api/pairs
+ * @param {object} increments map from GET /api/price_increments
+ * @returns {string|undefined} tick size
+ */
+func (this *Indodax) PairIncrement(market any, increments any) any {
+	var tickerId *string = this.SafeString(market, "ticker_id")
+	var priceStep *string = this.SafeString(increments, tickerId)
+	if priceStep == nil {
+		priceStep = this.SafeString(increments, this.SafeString(market, "id"))
+	}
+	return priceStep
+}
+
+/**
+ * @ignore
+ * @method
  * @name indodax#parsePublicTradingFee
  * @description parse the public pair fee, which is not an account fee tier
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
@@ -557,6 +626,7 @@ func (this *Indodax) ParsePublicTradingFee(market any) any {
  * @name indodax#fetchMarkets
  * @description retrieves data on all markets for indodax
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @returns {object[]} an array of objects representing market data
  */
@@ -573,6 +643,10 @@ func (this *Indodax) fetchMarketsBody(ch chan any, optionalArgs ...any) any {
 
 	response := (<-this.PublicGetApiPairs(params))
 	PanicOnError(response)
+
+	incrementsResponse := (<-this.PublicGetApiPriceIncrements(params))
+	PanicOnError(incrementsResponse)
+	var increments any = this.SafeDict(incrementsResponse, "increments", map[string]any{})
 	//
 	//     [
 	//         {
@@ -630,6 +704,7 @@ func (this *Indodax) fetchMarketsBody(ch chan any, optionalArgs ...any) any {
 			maker = GetValue(fee, "maker")
 		}
 		var amountStep *string = this.SafeString(market, "quantity_increment", "0.00000001")
+		var priceStep any = this.PairIncrement(market, increments)
 		result = append(result, map[string]any{
 			"id":             id,
 			"symbol":         Add(Add(base, "/"), quote),
@@ -660,7 +735,7 @@ func (this *Indodax) fetchMarketsBody(ch chan any, optionalArgs ...any) any {
 			"tierBased":      false,
 			"precision": map[string]any{
 				"amount": this.ParseNumber(amountStep),
-				"price":  this.ParseNumber(this.PairPriceStep(market)),
+				"price":  this.ParseNumber(this.PairPriceStep(market, priceStep)),
 				"cost":   this.ParseNumber(this.ParsePrecision(this.SafeString(market, "volume_precision"))),
 			},
 			"limits": map[string]any{
@@ -760,7 +835,7 @@ func (this *Indodax) fetchTradingLimitsBody(ch chan any, optionalArgs ...any) an
 
 	incrementsResponse := (<-this.PublicGetApiPriceIncrements(params))
 	PanicOnError(incrementsResponse)
-	var increments map[string]any = SafeMapTyped(incrementsResponse, "increments")
+	var increments any = this.SafeDict(incrementsResponse, "increments", map[string]any{})
 	var rawMarkets []any = this.ToArray(response)
 	var result map[string]any = map[string]any{}
 	for i := 0; i < len(rawMarkets); i++ {
@@ -780,11 +855,7 @@ func (this *Indodax) fetchTradingLimitsBody(ch chan any, optionalArgs ...any) an
 				continue
 			}
 		}
-		var tickerId *string = this.SafeString(market, "ticker_id")
-		var priceStep *string = this.SafeString(increments, tickerId)
-		if priceStep == nil {
-			priceStep = this.SafeString(increments, this.SafeString(market, "id"))
-		}
+		var priceStep any = this.PairIncrement(market, increments)
 		var amountStep *string = this.SafeString(market, "quantity_increment")
 		AddElementToObject(result, symbol, map[string]any{
 			"info": market,
@@ -913,15 +984,15 @@ func (this *Indodax) fetchBalanceBody(ch chan any, optionalArgs ...any) any {
 	_ = params
 	if EvalTruthy(this.IsTapiV2()) {
 
-		retRes74919 := (<-this.BalanceV2Async(params))
-		PanicOnError(retRes74919)
-		ch <- retRes74919
+		retRes81319 := (<-this.BalanceV2Async(params))
+		PanicOnError(retRes81319)
+		ch <- retRes81319
 		return nil
 	}
 	if this.Markets == nil {
 
-		retRes75212 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes75212)
+		retRes81612 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes81612)
 	}
 
 	response := (<-this.PrivatePostGetInfo(params))
@@ -985,8 +1056,8 @@ func (this *Indodax) fetchOrderBookBody(ch chan any, symbol any, optionalArgs ..
 	_ = params
 	if this.Markets == nil {
 
-		retRes80012 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes80012)
+		retRes86412 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes86412)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var request map[string]any = map[string]any{
@@ -1064,8 +1135,8 @@ func (this *Indodax) fetchTickerBody(ch chan any, symbol any, optionalArgs ...an
 	_ = params
 	if this.Markets == nil {
 
-		retRes86312 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes86312)
+		retRes92712 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes92712)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var request map[string]any = map[string]any{
@@ -1117,8 +1188,8 @@ func (this *Indodax) fetchTickersBody(ch chan any, optionalArgs ...any) any {
 	_ = params
 	if this.Markets == nil {
 
-		retRes89912 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes89912)
+		retRes96312 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes96312)
 	}
 	//
 	// {
@@ -1205,8 +1276,8 @@ func (this *Indodax) fetchTradesBody(ch chan any, symbol any, optionalArgs ...an
 	_ = params
 	if this.Markets == nil {
 
-		retRes96712 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes96712)
+		retRes103112 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes103112)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var request map[string]any = map[string]any{
@@ -1265,8 +1336,8 @@ func (this *Indodax) fetchOHLCVBody(ch chan any, symbol any, optionalArgs ...any
 	_ = params
 	if this.Markets == nil {
 
-		retRes101212 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes101212)
+		retRes107612 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes107612)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var selectedTimeframe *string = this.SafeString(this.Timeframes, timeframe, timeframe)
@@ -1383,20 +1454,40 @@ func (this *Indodax) ParseOrder(order any, optionalArgs ...any) any {
 	market = this.SafeMarket(marketId, market)
 	if market != nil {
 		symbol = GetValue(market, "symbol")
-		var quoteId any = GetValue(market, "quoteId")
-		var baseId any = GetValue(market, "baseId")
-		if (IsEqual(GetValue(market, "quoteId"), "idr")) && (InOp(order, "order_rp")) {
+		var quoteId any = this.SafeString(market, "quoteId")
+		var baseId any = this.SafeString(market, "baseId")
+		if (IsEqual(quoteId, nil)) || (IsEqual(baseId, nil)) {
+			var resolved map[string]any = MapTyped(this.MarketFromV1Pair(marketId))
+			var resolvedQuoteId *string = this.SafeString(resolved, "quoteId")
+			var resolvedBaseId *string = this.SafeString(resolved, "baseId")
+			if resolvedQuoteId != nil {
+				quoteId = resolvedQuoteId
+				symbol = DerefScalar(this.SafeString(resolved, "symbol", symbol))
+			}
+			if resolvedBaseId != nil {
+				baseId = resolvedBaseId
+			}
+		}
+		if (IsEqual(quoteId, "idr")) && (InOp(order, "order_rp")) {
 			quoteId = "rp"
 		}
-		if (IsEqual(GetValue(market, "baseId"), "idr")) && (InOp(order, "remain_rp")) {
+		if (IsEqual(baseId, "idr")) && (InOp(order, "remain_rp")) {
 			baseId = "rp"
 		}
-		cost = DerefScalar(this.SafeString(order, Add("order_", quoteId)))
-		amount = DerefScalar(this.SafeString(order, Add("order_", baseId)))
-		remaining = DerefScalar(this.SafeString(order, Add("remain_", baseId)))
-		// filled buy orders on idr-quoted markets carry the executed base amount
-		// only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
-		filled = DerefScalar(this.SafeString(order, Add("receive_", baseId)))
+		if !IsEqual(quoteId, nil) {
+			var costKey any = Add("order_", quoteId)
+			cost = DerefScalar(this.SafeString(order, costKey))
+		}
+		if !IsEqual(baseId, nil) {
+			var amountKey any = Add("order_", baseId)
+			var remainKey any = Add("remain_", baseId)
+			var filledKey any = Add("receive_", baseId)
+			amount = DerefScalar(this.SafeString(order, amountKey))
+			remaining = DerefScalar(this.SafeString(order, remainKey))
+			// filled buy orders on idr-quoted markets carry the executed base amount
+			// only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
+			filled = DerefScalar(this.SafeString(order, filledKey))
+		}
 	}
 	var timestamp *int64 = this.SafeInteger(order, "submit_time")
 	var fee any = nil
@@ -1452,9 +1543,9 @@ func (this *Indodax) fetchOrderBody(ch chan any, id any, optionalArgs ...any) an
 	_ = params
 	if EvalTruthy(this.IsTapiV2()) {
 
-		retRes118219 := (<-this.OrderV2Async(id, symbol, params))
-		PanicOnError(retRes118219)
-		ch <- retRes118219
+		retRes126619 := (<-this.OrderV2Async(id, symbol, params))
+		PanicOnError(retRes126619)
+		ch <- retRes126619
 		return nil
 	}
 	if symbol == nil {
@@ -1462,12 +1553,12 @@ func (this *Indodax) fetchOrderBody(ch chan any, id any, optionalArgs ...any) an
 	}
 	if this.Markets == nil {
 
-		retRes118812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes118812)
+		retRes127212 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes127212)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var request map[string]any = map[string]any{
-		"pair":     market["id"],
+		"pair":     this.V1PairId(market),
 		"order_id": id,
 	}
 
@@ -1513,21 +1604,21 @@ func (this *Indodax) fetchOpenOrdersBody(ch chan any, optionalArgs ...any) any {
 	_ = params
 	if EvalTruthy(this.IsTapiV2()) {
 
-		retRes121619 := (<-this.OpenOrdersV2Async(symbol, since, limit, params))
-		PanicOnError(retRes121619)
-		ch <- retRes121619
+		retRes130019 := (<-this.OpenOrdersV2Async(symbol, since, limit, params))
+		PanicOnError(retRes130019)
+		ch <- retRes130019
 		return nil
 	}
 	if this.Markets == nil {
 
-		retRes121912 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes121912)
+		retRes130312 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes130312)
 	}
 	var market any = nil
 	var request map[string]any = map[string]any{}
 	if symbol != nil {
 		market = this.Market(symbol)
-		request["pair"] = GetValue(market, "id")
+		request["pair"] = this.V1PairId(market)
 	}
 
 	response := (<-this.PrivatePostOpenOrders(this.Extend(request, params)))
@@ -1552,7 +1643,7 @@ func (this *Indodax) fetchOpenOrdersBody(ch chan any, optionalArgs ...any) any {
 	for i := 0; i < len(marketIds); i++ {
 		var marketId string = GetValue(marketIds, i).(string)
 		var marketOrders any = GetValue(rawOrders, marketId)
-		market = this.SafeMarket(marketId)
+		market = this.MarketFromV1Pair(marketId)
 		var parsedOrders any = this.ParseOrders(marketOrders, market, since, limit)
 		exchangeOrders = this.ArrayConcat(exchangeOrders, parsedOrders)
 	}
@@ -1602,12 +1693,12 @@ func (this *Indodax) fetchClosedOrdersBody(ch chan any, optionalArgs ...any) any
 	}
 	if this.Markets == nil {
 
-		retRes127212 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes127212)
+		retRes135612 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes135612)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var request map[string]any = map[string]any{
-		"pair": market["id"],
+		"pair": this.V1PairId(market),
 	}
 
 	response := (<-this.PrivatePostOrderHistory(this.Extend(request, params)))
@@ -1652,19 +1743,19 @@ func (this *Indodax) createOrderBody(ch chan any, symbol any, typeVar any, side 
 	_ = params
 	if EvalTruthy(this.IsTapiV2()) {
 
-		retRes130519 := (<-this.PlaceOrderV2Async(symbol, typeVar, side, amount, price, params))
-		PanicOnError(retRes130519)
-		ch <- retRes130519
+		retRes138919 := (<-this.PlaceOrderV2Async(symbol, typeVar, side, amount, price, params))
+		PanicOnError(retRes138919)
+		ch <- retRes138919
 		return nil
 	}
 	if this.Markets == nil {
 
-		retRes130812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes130812)
+		retRes139212 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes139212)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var request map[string]any = map[string]any{
-		"pair":  market["id"],
+		"pair":  this.V1PairId(market),
 		"type":  side,
 		"price": price,
 	}
@@ -1746,9 +1837,9 @@ func (this *Indodax) cancelOrderBody(ch chan any, id any, optionalArgs ...any) a
 	_ = params
 	if EvalTruthy(this.IsTapiV2()) {
 
-		retRes137819 := (<-this.RemoveOrderV2Async(id, symbol, params))
-		PanicOnError(retRes137819)
-		ch <- retRes137819
+		retRes146219 := (<-this.RemoveOrderV2Async(id, symbol, params))
+		PanicOnError(retRes146219)
+		ch <- retRes146219
 		return nil
 	}
 	if symbol == nil {
@@ -1760,13 +1851,13 @@ func (this *Indodax) cancelOrderBody(ch chan any, id any, optionalArgs ...any) a
 	}
 	if this.Markets == nil {
 
-		retRes138812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes138812)
+		retRes147212 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes147212)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var request map[string]any = map[string]any{
 		"order_id": id,
-		"pair":     market["id"],
+		"pair":     this.V1PairId(market),
 		"type":     side,
 	}
 
@@ -1821,8 +1912,8 @@ func (this *Indodax) fetchTransactionFeeBody(ch chan any, code any, optionalArgs
 	}
 	if this.Markets == nil {
 
-		retRes143412 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes143412)
+		retRes151812 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes151812)
 	}
 	var currency map[string]any = MapTyped(this.Currency(code))
 	var request map[string]any = map[string]any{
@@ -1875,8 +1966,8 @@ func (this *Indodax) fetchDepositWithdrawFeeBody(ch chan any, code any, optional
 		panic(NotSupported(this.Id + " fetchDepositWithdrawFee() is not available when options.tapiVersion is \"2\""))
 	}
 
-	retRes14738 := (<-this.LoadMarketsAsync())
-	PanicOnError(retRes14738)
+	retRes15578 := (<-this.LoadMarketsAsync())
+	PanicOnError(retRes15578)
 	var currency map[string]any = MapTyped(this.Currency(code))
 	var request map[string]any = map[string]any{
 		"currency": currency["id"],
@@ -1947,8 +2038,8 @@ func (this *Indodax) fetchDepositsWithdrawalsBody(ch chan any, optionalArgs ...a
 	}
 	if this.Markets == nil {
 
-		retRes151812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes151812)
+		retRes160212 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes160212)
 	}
 	var request map[string]any = map[string]any{}
 	if since != nil {
@@ -2074,9 +2165,9 @@ func (this *Indodax) withdrawBody(ch chan any, code any, amount any, address any
 	_ = params
 	if EvalTruthy(this.IsTapiV2()) {
 
-		retRes162819 := (<-this.SendWithdrawV2Async(code, amount, address, tag, params))
-		PanicOnError(retRes162819)
-		ch <- retRes162819
+		retRes171219 := (<-this.SendWithdrawV2Async(code, amount, address, tag, params))
+		PanicOnError(retRes171219)
+		ch <- retRes171219
 		return nil
 	}
 	tagparamsVariable := this.HandleWithdrawTagAndParams(tag, params)
@@ -2085,8 +2176,8 @@ func (this *Indodax) withdrawBody(ch chan any, code any, amount any, address any
 	this.CheckAddress(address)
 	if this.Markets == nil {
 
-		retRes163312 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes163312)
+		retRes171712 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes171712)
 	}
 	var currency map[string]any = MapTyped(this.Currency(code))
 	// Custom string you need to provide to identify each withdrawal.
@@ -2224,6 +2315,71 @@ func (this *Indodax) ParseTransactionStatus(status *string) *string {
 }
 
 /**
+ * @ignore
+ * @method
+ * @name indodax#v1DepositNetwork
+ * @description parse a getInfo network value, which may be a string, a comma-separated string, a list, or empty
+ * @param {object} networks network map from getInfo
+ * @param {string} currencyId currency id key
+ * @param {string} code unified currency code
+ * @returns {string|string[]|undefined} unified network code or a list of them
+ */
+func (this *Indodax) V1DepositNetwork(networks any, currencyId any, code any) any {
+	var networkList any = this.SafeList(networks, currencyId)
+	var networkIds []any = []any{}
+	if !IsEqual(networkList, nil) {
+		for i := 0; i < GetArrayLength(networkList); i++ {
+			var networkId *string = this.SafeString(networkList, i)
+			if networkId != nil {
+				networkIds = append(networkIds, networkId)
+			}
+		}
+	} else {
+		var networkId *string = this.SafeString(networks, currencyId)
+		if networkId != nil {
+			if func() int {
+				if networkId == nil {
+					return -1
+				}
+				return strings.Index(*networkId, ",")
+			}() >= 0 {
+				var parts []string = Split(networkId, ",")
+				for j := 0; j < len(parts); j++ {
+					networkIds = append(networkIds, GetValue(parts, j))
+				}
+			} else {
+				networkIds = append(networkIds, networkId)
+			}
+		}
+	}
+	var parsed []any = []any{}
+	for i := 0; i < len(networkIds); i++ {
+		var networkCode any = this.NetworkIdToCode(func() any {
+			if i >= 0 && i < len(networkIds) {
+				return DerefScalar(networkIds[i])
+			}
+			return nil
+		}(), code)
+		if networkCode != nil {
+			parsed = append(parsed, ToUpper(networkCode))
+		}
+	}
+	var parsedCount int = len(parsed)
+	if parsedCount < 1 {
+		return nil
+	}
+	if parsedCount == 1 {
+		return func() any {
+			if 0 >= 0 && 0 < len(parsed) {
+				return DerefScalar(parsed[0])
+			}
+			return nil
+		}()
+	}
+	return parsed
+}
+
+/**
  * @method
  * @name indodax#fetchDepositAddress
  * @description fetch the deposit address for a currency associated with this account
@@ -2290,15 +2446,15 @@ func (this *Indodax) fetchDepositAddressesBody(ch chan any, optionalArgs ...any)
 	_ = params
 	if EvalTruthy(this.IsTapiV2()) {
 
-		retRes179819 := (<-this.DepositAddressesV2Async(codes, params))
-		PanicOnError(retRes179819)
-		ch <- retRes179819
+		retRes193219 := (<-this.DepositAddressesV2Async(codes, params))
+		PanicOnError(retRes193219)
+		ch <- retRes193219
 		return nil
 	}
 	if this.Markets == nil {
 
-		retRes180112 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes180112)
+		retRes193512 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes193512)
 	}
 
 	response := (<-this.PrivatePostGetInfo(params))
@@ -2340,7 +2496,7 @@ func (this *Indodax) fetchDepositAddressesBody(ch chan any, optionalArgs ...any)
 	//
 	var data map[string]any = SafeMapTyped(response, "return")
 	var addresses map[string]any = SafeMapTyped(data, "address")
-	var networks map[string]any = SafeMapTyped(data, "network")
+	var networks any = this.SafeDict(data, "network", map[string]any{})
 	var addressKeys []string = ObjectKeys(addresses)
 	var result []any = []any{}
 	for i := 0; i < len(addressKeys); i++ {
@@ -2349,36 +2505,7 @@ func (this *Indodax) fetchDepositAddressesBody(ch chan any, optionalArgs ...any)
 		var address *string = this.SafeString(addresses, marketId)
 		if (address != nil) && ((codes == nil) || (this.InArray(code, codes))) {
 			this.CheckAddress(address)
-			var network any = nil
-			if func() bool { _, ok := networks[marketId]; return ok }() {
-				var networkId *string = this.SafeString(networks, marketId)
-				if networkId == nil {
-					panic(ExchangeError(this.Id + " fetchDepositAddresses() missing networkId"))
-				}
-				if func() int {
-					if networkId == nil {
-						return -1
-					}
-					return strings.Index(*networkId, ",")
-				}() >= 0 {
-					network = []any{}
-					if networkId == nil {
-						panic(ExchangeError(this.Id + " fetchDepositAddresses() missing networkId"))
-					}
-					var networkIds []string = Split(networkId, ",")
-					for j := 0; j < len(networkIds); j++ {
-						var _netIdTmp any = this.NetworkIdToCode(GetValue(networkIds, j), code)
-						if _netIdTmp != nil {
-							AppendToArray(&network, ToUpper(_netIdTmp))
-						}
-					}
-				} else {
-					var _netIdTmp any = this.NetworkIdToCode(networkId, code)
-					if _netIdTmp != nil {
-						network = ToUpper(_netIdTmp)
-					}
-				}
-			}
+			var network any = this.V1DepositNetwork(networks, marketId, code)
 			var finalNetwork any = network // java req
 			if code != nil {
 				result = append(result, map[string]any{
@@ -2417,8 +2544,8 @@ func (this *Indodax) balanceV2Body(ch chan any, optionalArgs ...any) any {
 	_ = params
 	if this.Markets == nil {
 
-		retRes190112 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes190112)
+		retRes201112 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes201112)
 	}
 	var request map[string]any = map[string]any{}
 	var omitZeroBalances *bool = this.SafeBool(params, "omitZeroBalances")
@@ -2625,8 +2752,8 @@ func (this *Indodax) orderV2Body(ch chan any, id any, optionalArgs ...any) any {
 	_ = params
 	if this.Markets == nil {
 
-		retRes208312 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes208312)
+		retRes219312 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes219312)
 	}
 	var orderRequest any = this.V2OrderRequest(id, symbol, params)
 	var market any = GetValue(orderRequest, 0)
@@ -2668,8 +2795,8 @@ func (this *Indodax) openOrdersV2Body(ch chan any, optionalArgs ...any) any {
 	_ = params
 	if this.Markets == nil {
 
-		retRes210512 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes210512)
+		retRes221512 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes221512)
 	}
 	var market any = nil
 	var request map[string]any = map[string]any{}
@@ -2738,8 +2865,8 @@ func (this *Indodax) historyV2Body(ch chan any, historyKind any, symbol any, opt
 	_ = params
 	if this.Markets == nil {
 
-		retRes215212 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes215212)
+		retRes226212 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes226212)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	params = this.Omit(params, []any{"symbol", "startTime", "endTime", "limit"})
@@ -2934,8 +3061,8 @@ func (this *Indodax) placeOrderV2Body(ch chan any, symbol any, orderType any, si
 	_ = params
 	if this.Markets == nil {
 
-		retRes228012 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes228012)
+		retRes239012 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes239012)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	if IsEqual(side, nil) {
@@ -3017,8 +3144,8 @@ func (this *Indodax) removeOrderV2Body(ch chan any, id any, optionalArgs ...any)
 	_ = params
 	if this.Markets == nil {
 
-		retRes234612 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes234612)
+		retRes245612 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes245612)
 	}
 	var orderRequest any = this.V2OrderRequest(id, symbol, params)
 	var market any = GetValue(orderRequest, 0)
@@ -3110,8 +3237,8 @@ func (this *Indodax) depositAddressesV2Body(ch chan any, optionalArgs ...any) an
 	}
 	if this.Markets == nil {
 
-		retRes240312 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes240312)
+		retRes251312 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes251312)
 	}
 	var networkCode any = nil
 	networkCodeparamsVariable := this.HandleNetworkCodeAndParams(params)
@@ -3401,8 +3528,8 @@ func (this *Indodax) fetchDepositsBody(ch chan any, optionalArgs ...any) any {
 	}
 	if this.Markets == nil {
 
-		retRes260012 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes260012)
+		retRes271012 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes271012)
 	}
 	var until *int64 = this.SafeInteger(params, "until")
 	params = this.Omit(params, []any{"until"})
@@ -3464,8 +3591,8 @@ func (this *Indodax) fetchWithdrawalsBody(ch chan any, optionalArgs ...any) any 
 	}
 	if this.Markets == nil {
 
-		retRes263512 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes263512)
+		retRes274512 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes274512)
 	}
 	var until *int64 = this.SafeInteger(params, "until")
 	params = this.Omit(params, []any{"until"})
@@ -3591,8 +3718,8 @@ func (this *Indodax) sendWithdrawV2Body(ch chan any, code any, amount any, addre
 	params = GetValue(tagparamsVariable, 1)
 	if this.Markets == nil {
 
-		retRes272412 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes272412)
+		retRes283412 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes283412)
 	}
 	var currency map[string]any = MapTyped(this.Currency(code))
 	if GetValue(currency, "code") == "IDR" {
@@ -3825,6 +3952,7 @@ func (this *Indodax) FetchTime(params ...any) (int64, error) {
  * @name indodax#fetchMarkets
  * @description retrieves data on all markets for indodax
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @returns {object[]} an array of objects representing market data
  */

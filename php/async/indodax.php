@@ -406,6 +406,49 @@ class indodax extends Exchange {
         return strtolower($marketId);
     }
 
+    public function v1_pair_id(array $market): string {
+        /**
+         * @ignore
+         * TAPI v1 pair id, which is ticker_id rather than the public pair id
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md
+         *
+         * @param {array} $market unified $market
+         * @return {string} pair id such as btc_idr
+         */
+        $info = $this->safe_dict($market, 'info', array());
+        $tickerId = $this->safe_string($info, 'ticker_id');
+        if ($tickerId !== null) {
+            return $tickerId;
+        }
+        return $this->safe_string($market, 'id', '');
+    }
+
+    public function market_from_v1_pair(?string $pairId): array {
+        /**
+         * @ignore
+         * find a market for a TAPI v1 pair id such as btc_idr
+         * @param {string} $pairId pair id from an order or the open-orders map
+         * @return {array} a market structure
+         */
+        if (($pairId !== null) && ($this->markets_by_id !== null) && (is_array($this->markets_by_id) && array_key_exists($pairId ?? '', $this->markets_by_id))) {
+            return $this->safe_market($pairId);
+        }
+        $marketList = $this->to_array($this->markets);
+        for ($i = 0; $i < count($marketList); $i++) {
+            $entry = $marketList[$i];
+            $info = $this->safe_dict($entry, 'info', array());
+            $tickerId = $this->safe_string($info, 'ticker_id');
+            if (($tickerId !== null) && ($tickerId === $pairId)) {
+                return $entry;
+            }
+        }
+        if (($pairId !== null) && (mb_strpos($pairId, '_') !== false)) {
+            return $this->safe_market($pairId, null, '_');
+        }
+        return $this->safe_market($pairId);
+    }
+
     public function fetch_time($params = array()): PromiseInterface {
         return Async\async(self::do_fetch_time(...))($params);
     }
@@ -455,6 +498,25 @@ class indodax extends Exchange {
         return $this->parse_precision($this->safe_string($market, 'price_round'));
     }
 
+    public function pair_increment(array $market, array $increments): ?string {
+        /**
+         * @ignore
+         * price step from GET /api/price_increments for one raw pair
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-$increments
+         *
+         * @param {array} $market raw pair from GET /api/pairs
+         * @param {array} $increments map from GET /api/price_increments
+         * @return {string|null} tick size
+         */
+        $tickerId = $this->safe_string($market, 'ticker_id');
+        $priceStep = $this->safe_string($increments, $tickerId);
+        if ($priceStep === null) {
+            $priceStep = $this->safe_string($increments, $this->safe_string($market, 'id'));
+        }
+        return $priceStep;
+    }
+
     public function parse_public_trading_fee(array $market) {
         /**
          * @ignore
@@ -493,11 +555,14 @@ class indodax extends Exchange {
          * retrieves data on all markets for indodax
          *
          * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-$increments
          *
          * @param {array} [$params] extra parameters specific to the exchange API endpoint
          * @return {array[]} an array of objects representing $market data
          */
         $response = Async\await($this->publicGetApiPairs($params));
+        $incrementsResponse = Async\await($this->publicGetApiPriceIncrements($params));
+        $increments = $this->safe_dict($incrementsResponse, 'increments', array());
         //
         //     [
         //         {
@@ -550,6 +615,7 @@ class indodax extends Exchange {
                 $maker = $fee['maker'];
             }
             $amountStep = $this->safe_string($market, 'quantity_increment', '0.00000001');
+            $priceStep = $this->pair_increment($market, $increments);
             $result[] = array(
                 'id' => $id,
                 'symbol' => $base . '/' . $quote,
@@ -580,7 +646,7 @@ class indodax extends Exchange {
                 'tierBased' => false,
                 'precision' => array(
                     'amount' => $this->parse_number($amountStep),
-                    'price' => $this->parse_number($this->pair_price_step($market)),
+                    'price' => $this->parse_number($this->pair_price_step($market, $priceStep)),
                     'cost' => $this->parse_number($this->parse_precision($this->safe_string($market, 'volume_precision'))),
                 ),
                 'limits' => array(
@@ -668,11 +734,7 @@ class indodax extends Exchange {
                     continue;
                 }
             }
-            $tickerId = $this->safe_string($market, 'ticker_id');
-            $priceStep = $this->safe_string($increments, $tickerId);
-            if ($priceStep === null) {
-                $priceStep = $this->safe_string($increments, $this->safe_string($market, 'id'));
-            }
+            $priceStep = $this->pair_increment($market, $increments);
             $amountStep = $this->safe_string($market, 'quantity_increment');
             $result[$symbol] = array(
                 'info' => $market,
@@ -1164,20 +1226,40 @@ class indodax extends Exchange {
         $market = $this->safe_market($marketId, $market);
         if ($market !== null) {
             $symbol = $market['symbol'];
-            $quoteId = $market['quoteId'];
-            $baseId = $market['baseId'];
-            if (($market['quoteId'] === 'idr') && (is_array($order) && array_key_exists('order_rp' ?? '', $order))) {
+            $quoteId = $this->safe_string($market, 'quoteId');
+            $baseId = $this->safe_string($market, 'baseId');
+            if (($quoteId === null) || ($baseId === null)) {
+                $resolved = $this->market_from_v1_pair($marketId);
+                $resolvedQuoteId = $this->safe_string($resolved, 'quoteId');
+                $resolvedBaseId = $this->safe_string($resolved, 'baseId');
+                if ($resolvedQuoteId !== null) {
+                    $quoteId = $resolvedQuoteId;
+                    $symbol = $this->safe_string($resolved, 'symbol', $symbol);
+                }
+                if ($resolvedBaseId !== null) {
+                    $baseId = $resolvedBaseId;
+                }
+            }
+            if (($quoteId === 'idr') && (is_array($order) && array_key_exists('order_rp' ?? '', $order))) {
                 $quoteId = 'rp';
             }
-            if (($market['baseId'] === 'idr') && (is_array($order) && array_key_exists('remain_rp' ?? '', $order))) {
+            if (($baseId === 'idr') && (is_array($order) && array_key_exists('remain_rp' ?? '', $order))) {
                 $baseId = 'rp';
             }
-            $cost = $this->safe_string($order, 'order_' . $quoteId);
-            $amount = $this->safe_string($order, 'order_' . $baseId);
-            $remaining = $this->safe_string($order, 'remain_' . $baseId);
-            // filled buy orders on idr-quoted markets carry the executed base amount
-            // only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
-            $filled = $this->safe_string($order, 'receive_' . $baseId);
+            if ($quoteId !== null) {
+                $costKey = 'order_' . $quoteId;
+                $cost = $this->safe_string($order, $costKey);
+            }
+            if ($baseId !== null) {
+                $amountKey = 'order_' . $baseId;
+                $remainKey = 'remain_' . $baseId;
+                $filledKey = 'receive_' . $baseId;
+                $amount = $this->safe_string($order, $amountKey);
+                $remaining = $this->safe_string($order, $remainKey);
+                // filled buy orders on idr-quoted markets carry the executed base amount
+                // only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
+                $filled = $this->safe_string($order, $filledKey);
+            }
         }
         $timestamp = $this->safe_integer($order, 'submit_time');
         $fee = null;
@@ -1235,7 +1317,7 @@ class indodax extends Exchange {
         }
         $market = $this->market($symbol);
         $request = array(
-            'pair' => $market['id'],
+            'pair' => $this->v1_pair_id($market),
             'order_id' => $id,
         );
         $response = Async\await($this->privatePostGetOrder($this->extend($request, $params)));
@@ -1272,7 +1354,7 @@ class indodax extends Exchange {
         $request = array();
         if ($symbol !== null) {
             $market = $this->market($symbol);
-            $request['pair'] = $market['id'];
+            $request['pair'] = $this->v1_pair_id($market);
         }
         $response = Async\await($this->privatePostOpenOrders($this->extend($request, $params)));
         $openOrdersResult = $this->safe_dict($response, 'return', array());
@@ -1291,7 +1373,7 @@ class indodax extends Exchange {
         for ($i = 0; $i < count($marketIds); $i++) {
             $marketId = $marketIds[$i];
             $marketOrders = $rawOrders[$marketId];
-            $market = $this->safe_market($marketId);
+            $market = $this->market_from_v1_pair($marketId);
             $parsedOrders = $this->parse_orders($marketOrders, $market, $since, $limit);
             $exchangeOrders = $this->array_concat($exchangeOrders, $parsedOrders);
         }
@@ -1327,7 +1409,7 @@ class indodax extends Exchange {
         }
         $market = $this->market($symbol);
         $request = array(
-            'pair' => $market['id'],
+            'pair' => $this->v1_pair_id($market),
         );
         $response = Async\await($this->privatePostOrderHistory($this->extend($request, $params)));
         $historyResult = $this->safe_dict($response, 'return', array());
@@ -1367,7 +1449,7 @@ class indodax extends Exchange {
         }
         $market = $this->market($symbol);
         $request = array(
-            'pair' => $market['id'],
+            'pair' => $this->v1_pair_id($market),
             'type' => $side,
             'price' => $price,
         );
@@ -1452,7 +1534,7 @@ class indodax extends Exchange {
         $market = $this->market($symbol);
         $request = array(
             'order_id' => $id,
-            'pair' => $market['id'],
+            'pair' => $this->v1_pair_id($market),
             'type' => $side,
         );
         $response = Async\await($this->privatePostCancelOrder($this->extend($request, $params)));
@@ -1836,6 +1918,54 @@ class indodax extends Exchange {
         return $this->safe_string($statuses, $status, $status);
     }
 
+    public function v1_deposit_network(array $networks, string $currencyId, ?string $code) {
+        /**
+         * @ignore
+         * parse a getInfo network value, which may be a string, a comma-separated string, a list, or empty
+         * @param {array} $networks network map from getInfo
+         * @param {string} $currencyId currency id key
+         * @param {string} $code unified currency $code
+         * @return {string|string[]|null} unified network $code or a list of them
+         */
+        $networkList = $this->safe_list($networks, $currencyId);
+        $networkIds = array();
+        if ($networkList !== null) {
+            for ($i = 0; $i < count($networkList); $i++) {
+                $networkId = $this->safe_string($networkList, $i);
+                if ($networkId !== null) {
+                    $networkIds[] = $networkId;
+                }
+            }
+        } else {
+            $networkId = $this->safe_string($networks, $currencyId);
+            if ($networkId !== null) {
+                if (mb_strpos($networkId, ',') !== false) {
+                    $parts = explode(',', $networkId);
+                    for ($j = 0; $j < count($parts); $j++) {
+                        $networkIds[] = $parts[$j];
+                    }
+                } else {
+                    $networkIds[] = $networkId;
+                }
+            }
+        }
+        $parsed = array();
+        for ($i = 0; $i < count($networkIds); $i++) {
+            $networkCode = $this->network_id_to_code($networkIds[$i], $code);
+            if ($networkCode !== null) {
+                $parsed[] = strtoupper($networkCode);
+            }
+        }
+        $parsedCount = count($parsed);
+        if ($parsedCount < 1) {
+            return null;
+        }
+        if ($parsedCount === 1) {
+            return $parsed[0];
+        }
+        return $parsed;
+    }
+
     public function fetch_deposit_address(string $code, $params = array()): PromiseInterface {
         return Async\async(self::do_fetch_deposit_address(...))($code, $params);
     }
@@ -1933,31 +2063,7 @@ class indodax extends Exchange {
             $address = $this->safe_string($addresses, $marketId);
             if (($address !== null) && (($codes === null) || ($this->in_array($code, $codes)))) {
                 $this->check_address($address);
-                $network = null;
-                if (is_array($networks) && array_key_exists($marketId ?? '', $networks)) {
-                    $networkId = $this->safe_string($networks, $marketId);
-                    if ($networkId === null) {
-                        throw new ExchangeError($this->id . ' fetchDepositAddresses() missing networkId');
-                    }
-                    if (mb_strpos($networkId, ',') !== false) {
-                        $network = array();
-                        if ($networkId === null) {
-                            throw new ExchangeError($this->id . ' fetchDepositAddresses() missing networkId');
-                        }
-                        $networkIds = explode(',', $networkId);
-                        for ($j = 0; $j < count($networkIds); $j++) {
-                            $_netIdTmp = $this->network_id_to_code($networkIds[$j], $code);
-                            if ($_netIdTmp !== null) {
-                                $network[] = strtoupper($_netIdTmp);
-                            }
-                        }
-                    } else {
-                        $_netIdTmp = $this->network_id_to_code($networkId, $code);
-                        if ($_netIdTmp !== null) {
-                            $network = strtoupper($_netIdTmp);
-                        }
-                    }
-                }
+                $network = $this->v1_deposit_network($networks, $marketId, $code);
                 $finalNetwork = $network; // java req
                 if ($code !== null) {
                     $result[] = array(

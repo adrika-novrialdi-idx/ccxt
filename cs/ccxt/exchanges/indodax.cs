@@ -458,6 +458,58 @@ public partial class indodax : Exchange
     }
 
     /**
+     * @ignore
+     * @method
+     * @name indodax#v1PairId
+     * @description TAPI v1 pair id, which is ticker_id rather than the public pair id
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md
+     * @param {object} market unified market
+     * @returns {string} pair id such as btc_idr
+     */
+    public virtual object v1PairId(object market)
+    {
+        IDictionary<string, object> info = this.safeDict(market, "info", new Dictionary<string, object>() {});
+        string? tickerId = this.safeString(info, "ticker_id");
+        if ((tickerId != null))
+        {
+            return tickerId;
+        }
+        return this.safeString(market, "id", "");
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#marketFromV1Pair
+     * @description find a market for a TAPI v1 pair id such as btc_idr
+     * @param {string} pairId pair id from an order or the open-orders map
+     * @returns {object} a market structure
+     */
+    public virtual object marketFromV1Pair(object pairId)
+    {
+        if (((pairId != null)) && ((this.markets_by_id != null)) && (inOp(this.markets_by_id, pairId)))
+        {
+            return this.safeMarket(pairId);
+        }
+        IList<object> marketList = this.toArray(this.markets);
+        for (int i = 0; i < (marketList?.Count ?? 0); i++)
+        {
+            object entry = marketList[i];
+            IDictionary<string, object> info = this.safeDict(entry, "info", new Dictionary<string, object>() {});
+            string? tickerId = this.safeString(info, "ticker_id");
+            if (((tickerId != null)) && (isEqual(tickerId, pairId)))
+            {
+                return entry;
+            }
+        }
+        if (((pairId != null)) && (((string)pairId).IndexOf("_", StringComparison.Ordinal) >= 0))
+        {
+            return this.safeMarket(pairId, null, "_");
+        }
+        return this.safeMarket(pairId);
+    }
+
+    /**
      * @method
      * @name indodax#fetchTime
      * @description fetches the current integer timestamp in milliseconds from the exchange server
@@ -511,6 +563,27 @@ public partial class indodax : Exchange
     /**
      * @ignore
      * @method
+     * @name indodax#pairIncrement
+     * @description price step from GET /api/price_increments for one raw pair
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {object} market raw pair from GET /api/pairs
+     * @param {object} increments map from GET /api/price_increments
+     * @returns {string|undefined} tick size
+     */
+    public virtual object pairIncrement(object market, object increments)
+    {
+        string? tickerId = this.safeString(market, "ticker_id");
+        string? priceStep = this.safeString(increments, tickerId);
+        if ((priceStep == null))
+        {
+            priceStep = this.safeString(increments, this.safeString(market, "id"));
+        }
+        return priceStep;
+    }
+
+    /**
+     * @ignore
+     * @method
      * @name indodax#parsePublicTradingFee
      * @description parse the public pair fee, which is not an account fee tier
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
@@ -544,6 +617,7 @@ public partial class indodax : Exchange
      * @name indodax#fetchMarkets
      * @description retrieves data on all markets for indodax
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @returns {object[]} an array of objects representing market data
      */
@@ -551,6 +625,8 @@ public partial class indodax : Exchange
     {
         parameters ??= new Dictionary<string, object>();
         List<object> response = await this.publicGetApiPairs(parameters);
+        Dictionary<string, object> incrementsResponse = await this.publicGetApiPriceIncrements(parameters);
+        IDictionary<string, object> increments = this.safeDict(incrementsResponse, "increments", new Dictionary<string, object>() {});
         //
         //     [
         //         {
@@ -606,6 +682,7 @@ public partial class indodax : Exchange
                 maker = getValue(fee, "maker");
             }
             string? amountStep = this.safeString(market, "quantity_increment", "0.00000001");
+            string? priceStep = ((string)this.pairIncrement(market, increments));
             ((IList<object>)result).Add(new Dictionary<string, object>() {
                 { "id", id },
                 { "symbol", add(add(bs, "/"), quote) },
@@ -636,7 +713,7 @@ public partial class indodax : Exchange
                 { "tierBased", false },
                 { "precision", new Dictionary<string, object>() {
                     { "amount", this.parseNumber(amountStep) },
-                    { "price", this.parseNumber(this.pairPriceStep(market)) },
+                    { "price", this.parseNumber(this.pairPriceStep(market, priceStep)) },
                     { "cost", this.parseNumber(this.parsePrecision(this.safeString(market, "volume_precision"))) },
                 } },
                 { "limits", new Dictionary<string, object>() {
@@ -726,12 +803,7 @@ public partial class indodax : Exchange
                     continue;
                 }
             }
-            string? tickerId = this.safeString(market, "ticker_id");
-            string? priceStep = this.safeString(increments, tickerId);
-            if ((priceStep == null))
-            {
-                priceStep = this.safeString(increments, this.safeString(market, "id"));
-            }
+            string? priceStep = ((string)this.pairIncrement(market, increments));
             string? amountStep = this.safeString(market, "quantity_increment");
             ((IDictionary<string,object>)result)[(string)symbol] = new Dictionary<string, object>() {
                 { "info", market },
@@ -1236,22 +1308,47 @@ public partial class indodax : Exchange
         if ((market != null))
         {
             symbol = getValue(market, "symbol");
-            object quoteId = getValue(market, "quoteId");
-            object baseId = getValue(market, "baseId");
-            if ((isEqual(getValue(market, "quoteId"), "idr")) && ((order != null && ((IDictionary<string, object>)order).ContainsKey("order_rp"))))
+            string? quoteId = this.safeString(market, "quoteId");
+            string? baseId = this.safeString(market, "baseId");
+            if (((quoteId == null)) || ((baseId == null)))
+            {
+                object resolved = this.marketFromV1Pair(marketId);
+                string? resolvedQuoteId = this.safeString(resolved, "quoteId");
+                string? resolvedBaseId = this.safeString(resolved, "baseId");
+                if ((resolvedQuoteId != null))
+                {
+                    quoteId = resolvedQuoteId;
+                    symbol = this.safeString(resolved, "symbol", symbol);
+                }
+                if ((resolvedBaseId != null))
+                {
+                    baseId = resolvedBaseId;
+                }
+            }
+            if (((quoteId == "idr")) && ((order != null && ((IDictionary<string, object>)order).ContainsKey("order_rp"))))
             {
                 quoteId = "rp";
             }
-            if ((isEqual(getValue(market, "baseId"), "idr")) && ((order != null && ((IDictionary<string, object>)order).ContainsKey("remain_rp"))))
+            if (((baseId == "idr")) && ((order != null && ((IDictionary<string, object>)order).ContainsKey("remain_rp"))))
             {
                 baseId = "rp";
             }
-            cost = this.safeString(order, ("order_" + (quoteId)));
-            amount = this.safeString(order, ("order_" + (baseId)));
-            remaining = this.safeString(order, ("remain_" + (baseId)));
-            // filled buy orders on idr-quoted markets carry the executed base amount
-            // only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
-            filled = this.safeString(order, ("receive_" + (baseId)));
+            if ((quoteId != null))
+            {
+                string costKey = ("order_" + quoteId);
+                cost = this.safeString(order, costKey);
+            }
+            if ((baseId != null))
+            {
+                string amountKey = ("order_" + baseId);
+                string remainKey = ("remain_" + baseId);
+                string filledKey = ("receive_" + baseId);
+                amount = this.safeString(order, amountKey);
+                remaining = this.safeString(order, remainKey);
+                // filled buy orders on idr-quoted markets carry the executed base amount
+                // only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
+                filled = this.safeString(order, filledKey);
+            }
         }
         Int64? timestamp = this.safeInteger(order, "submit_time");
         object fee = null;
@@ -1310,7 +1407,7 @@ public partial class indodax : Exchange
         }
         Dictionary<string, object> market = this.market(symbol);
         Dictionary<string, object> request = new Dictionary<string, object>() {
-            { "pair", (market.ContainsKey("id") ? market["id"] : null) },
+            { "pair", this.v1PairId(market) },
             { "order_id", id },
         };
         Dictionary<string, object> response = await this.privatePostGetOrder(this.extend(request, parameters));
@@ -1345,12 +1442,12 @@ public partial class indodax : Exchange
         {
             await this.loadMarkets();
         }
-        IDictionary<string, object> market = null;
+        object market = null;
         Dictionary<string, object> request = new Dictionary<string, object>() {};
         if ((symbol != null))
         {
             market = this.market(symbol);
-            ((IDictionary<string,object>)request)["pair"] = (market.ContainsKey("id") ? market["id"] : null);
+            ((IDictionary<string,object>)request)["pair"] = this.v1PairId(market);
         }
         Dictionary<string, object> response = await this.privatePostOpenOrders(this.extend(request, parameters));
         IDictionary<string, object> openOrdersResult = this.safeDict(response, "return", new Dictionary<string, object>() {});
@@ -1372,7 +1469,7 @@ public partial class indodax : Exchange
         {
             string? marketId = ((string)marketIds[i]);
             object marketOrders = getValue(rawOrders, marketId);
-            market = this.safeMarket(marketId);
+            market = this.marketFromV1Pair(marketId);
             IList<object> parsedOrders = this.parseOrders(marketOrders, market, since, limit);
             exchangeOrders = this.arrayConcat(exchangeOrders, parsedOrders);
         }
@@ -1409,7 +1506,7 @@ public partial class indodax : Exchange
         }
         Dictionary<string, object> market = this.market(symbol);
         Dictionary<string, object> request = new Dictionary<string, object>() {
-            { "pair", (market.ContainsKey("id") ? market["id"] : null) },
+            { "pair", this.v1PairId(market) },
         };
         Dictionary<string, object> response = await this.privatePostOrderHistory(this.extend(request, parameters));
         IDictionary<string, object> historyResult = this.safeDict(response, "return", new Dictionary<string, object>() {});
@@ -1449,7 +1546,7 @@ public partial class indodax : Exchange
         }
         Dictionary<string, object> market = this.market(symbol);
         Dictionary<string, object> request = new Dictionary<string, object>() {
-            { "pair", (market.ContainsKey("id") ? market["id"] : null) },
+            { "pair", this.v1PairId(market) },
             { "type", side },
             { "price", price },
         };
@@ -1544,7 +1641,7 @@ public partial class indodax : Exchange
         Dictionary<string, object> market = this.market(symbol);
         Dictionary<string, object> request = new Dictionary<string, object>() {
             { "order_id", id },
-            { "pair", (market.ContainsKey("id") ? market["id"] : null) },
+            { "pair", this.v1PairId(market) },
             { "type", side },
         };
         Dictionary<string, object> response = await this.privatePostCancelOrder(this.extend(request, parameters));
@@ -1937,6 +2034,69 @@ public partial class indodax : Exchange
     }
 
     /**
+     * @ignore
+     * @method
+     * @name indodax#v1DepositNetwork
+     * @description parse a getInfo network value, which may be a string, a comma-separated string, a list, or empty
+     * @param {object} networks network map from getInfo
+     * @param {string} currencyId currency id key
+     * @param {string} code unified currency code
+     * @returns {string|string[]|undefined} unified network code or a list of them
+     */
+    public virtual object v1DepositNetwork(object networks, object currencyId, object code)
+    {
+        List<object> networkList = this.safeList(networks, currencyId);
+        List<object> networkIds = new List<object>() {};
+        if ((networkList != null))
+        {
+            for (int i = 0; i < networkList.Count; i++)
+            {
+                string? networkId = this.safeString(networkList, i);
+                if ((networkId != null))
+                {
+                    ((IList<object>)networkIds).Add(networkId);
+                }
+            }
+        } else
+        {
+            string? networkId = this.safeString(networks, currencyId);
+            if ((networkId != null))
+            {
+                if (((string)networkId).IndexOf(",", StringComparison.Ordinal) >= 0)
+                {
+                    List<object> parts = networkId.Split(new [] {((string)",")}, StringSplitOptions.None).ToList<object>();
+                    for (int j = 0; j < parts.Count; j++)
+                    {
+                        ((IList<object>)networkIds).Add(parts[j]);
+                    }
+                } else
+                {
+                    ((IList<object>)networkIds).Add(networkId);
+                }
+            }
+        }
+        List<object> parsed = new List<object>() {};
+        for (int i = 0; i < (networkIds?.Count ?? 0); i++)
+        {
+            object networkCode = this.networkIdToCode(networkIds[i], code);
+            if ((networkCode != null))
+            {
+                ((IList<object>)parsed).Add(((string)networkCode).ToUpper());
+            }
+        }
+        int parsedCount = (parsed?.Count ?? 0);
+        if (parsedCount < 1)
+        {
+            return null;
+        }
+        if ((parsedCount == 1))
+        {
+            return getValue(parsed, 0);
+        }
+        return parsed;
+    }
+
+    /**
      * @method
      * @name indodax#fetchDepositAddress
      * @description fetch the deposit address for a currency associated with this account
@@ -2035,39 +2195,7 @@ public partial class indodax : Exchange
             if (((address != null)) && (((codes == null)) || (this.inArray(code, codes))))
             {
                 this.checkAddress(address);
-                object network = null;
-                if (inOp(networks, marketId))
-                {
-                    string? networkId = this.safeString(networks, marketId);
-                    if ((networkId == null))
-                    {
-                        throw new ExchangeError ((string)(this.id + " fetchDepositAddresses() missing networkId")) ;
-                    }
-                    if (((string)networkId).IndexOf(",", StringComparison.Ordinal) >= 0)
-                    {
-                        network = new List<object>() {};
-                        if ((networkId == null))
-                        {
-                            throw new ExchangeError ((string)(this.id + " fetchDepositAddresses() missing networkId")) ;
-                        }
-                        List<object> networkIds = networkId.Split(new [] {((string)",")}, StringSplitOptions.None).ToList<object>();
-                        for (int j = 0; j < networkIds.Count; j++)
-                        {
-                            object _netIdTmp = this.networkIdToCode(networkIds[j], code);
-                            if ((_netIdTmp != null))
-                            {
-                                ((IList<object>)network).Add(((string)_netIdTmp).ToUpper());
-                            }
-                        }
-                    } else
-                    {
-                        object _netIdTmp = this.networkIdToCode(networkId, code);
-                        if ((_netIdTmp != null))
-                        {
-                            network = ((string)_netIdTmp).ToUpper();
-                        }
-                    }
-                }
+                object network = this.v1DepositNetwork(networks, marketId, code);
                 object finalNetwork = network; // java req
                 if ((code != null))
                 {
