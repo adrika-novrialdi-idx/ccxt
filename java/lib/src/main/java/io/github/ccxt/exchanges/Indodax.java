@@ -323,6 +323,7 @@ public class Indodax extends IndodaxApi
                     put( "-1121", BadSymbol.class );
                     put( "-2013", OrderNotFound.class );
                     put( "-1021", InvalidNonce.class );
+                    put( "invalid_timestamp", InvalidNonce.class );
                     put( "-1022", AuthenticationError.class );
                     put( "-1002", AuthenticationError.class );
                     put( "-2014", AuthenticationError.class );
@@ -459,6 +460,19 @@ public class Indodax extends IndodaxApi
     public Object nonce()
     {
         return Helpers.subtract(this.milliseconds(), ((Map<String, Object>)this.options).get("timeDifference"));
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#requestTimestamp
+     * @description millisecond timestamp for a signed request, as an integer string
+     * @returns {string} timestamp in milliseconds
+     */
+    public Object requestTimestamp()
+    {
+        Long timeDifference = this.safeInteger(this.options, "timeDifference", 0);
+        return this.numberToString((this.milliseconds() - timeDifference));
     }
 
     /**
@@ -3613,7 +3627,7 @@ public class Indodax extends IndodaxApi
             }
             url = Helpers.add(Helpers.add(url, "/api/v2/"), this.implodeParams(path, parameters));
             Object query = this.urlencode(this.extend(new HashMap<String, Object>() {{
-                put( "timestamp", Indodax.this.nonce() );
+                put( "timestamp", Indodax.this.requestTimestamp() );
                 put( "recvWindow", Indodax.this.safeInteger(Indodax.this.options, "recvWindow", 5000) );
             }}, parameters));
             Object signature = this.hmac(this.encode(query), this.encode(this.secret), sha256());
@@ -3634,8 +3648,8 @@ public class Indodax extends IndodaxApi
             this.checkRequiredCredentials();
             body = this.urlencode(this.extend(new HashMap<String, Object>() {{
                 put( "method", path );
-                put( "timestamp", Indodax.this.nonce() );
-                put( "recvWindow", ((Map<String, Object>)Indodax.this.options).get("recvWindow") );
+                put( "timestamp", Indodax.this.requestTimestamp() );
+                put( "recvWindow", Indodax.this.safeInteger(Indodax.this.options, "recvWindow", 5000) );
             }}, parameters));
             final Object finalBody = body;
             headers = new HashMap<String, Object>() {{
@@ -3654,6 +3668,50 @@ public class Indodax extends IndodaxApi
             put( "body", finalBody_2 );
             put( "headers", finalHeaders );
         }};
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#request
+     * @description send a request and retry once when the exchange rejects the timestamp
+     * @param {string} path endpoint path
+     * @param {string} [api] api section, public, private, or v2
+     * @param {string} [method] http method
+     * @param {object} [params] request parameters
+     * @param {object} [headers] request headers
+     * @param {string} [body] request body
+     * @param {object} [config] request config
+     * @returns {object} the exchange response
+     */
+    public CompletableFuture<Object> request(Object path, Object... optionalArgs)
+    {
+
+        return BaseExchange.supplyAsync(() -> {
+
+            Object api = optionalArgs != null && optionalArgs.length > 0 ? optionalArgs[0] : "public";
+            Object method = optionalArgs != null && optionalArgs.length > 1 ? optionalArgs[1] : "GET";
+            Object parameters = optionalArgs != null && optionalArgs.length > 2 ? optionalArgs[2] : new HashMap<String, Object>() {{}};
+            Object headers = optionalArgs != null && optionalArgs.length > 3 ? optionalArgs[3] : null;
+            Object body = optionalArgs != null && optionalArgs.length > 4 ? optionalArgs[4] : null;
+            Object config = optionalArgs != null && optionalArgs.length > 5 ? optionalArgs[5] : new HashMap<String, Object>() {{}};
+            try
+            {
+                return (this.fetch2(path, api, method, parameters, headers, body, config)).join();
+            } catch(Exception e)
+            {
+                Boolean adjusted = (Boolean) this.safeBool(this.options, "timestampAdjusted", false);
+                if ((java.util.Objects.equals(api, "public")) || Boolean.TRUE.equals(adjusted) || !(Helpers.isInstance(e, InvalidNonce.class)))
+                {
+                    throw (e instanceof RuntimeException ? (RuntimeException)e : new RuntimeException(e));
+                }
+                Helpers.addElementToObject(this.options, "timestampAdjusted", true);
+                (this.loadTimeDifference()).join();
+                return (this.fetch2(path, api, method, parameters, headers, body, config)).join();
+            }
+            return null;
+        });
+
     }
 
     public Object handleErrors(Object code, Object reason, Object url, Object method, Object headers, Object body, Object response, Object requestHeaders, Object requestBody)
@@ -3717,6 +3775,11 @@ public class Indodax extends IndodaxApi
             }
         }
         String feedback = ((this.id + " ") + body);
+        String errorCodeText = this.safeString(response, "error_code");
+        if (!java.util.Objects.equals(errorCodeText, null))
+        {
+            this.throwExactlyMatchedException(((Map<String, Object>)this.exceptions).get("exact"), errorCodeText, feedback);
+        }
         this.throwExactlyMatchedException(((Map<String, Object>)this.exceptions).get("exact"), error, feedback);
         this.throwBroadlyMatchedException(((Map<String, Object>)this.exceptions).get("broad"), error, feedback);
         throw new ExchangeError(feedback) ;

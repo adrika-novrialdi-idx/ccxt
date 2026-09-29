@@ -223,6 +223,7 @@ class indodax extends Exchange {
                     '-1121' => '\\ccxt\\BadSymbol',
                     '-2013' => '\\ccxt\\OrderNotFound',
                     '-1021' => '\\ccxt\\InvalidNonce',
+                    'invalid_timestamp' => '\\ccxt\\InvalidNonce',
                     '-1022' => '\\ccxt\\AuthenticationError',
                     '-1002' => '\\ccxt\\AuthenticationError',
                     '-2014' => '\\ccxt\\AuthenticationError',
@@ -370,6 +371,16 @@ class indodax extends Exchange {
 
     public function nonce(): float {
         return $this->milliseconds() - $this->options['timeDifference'];
+    }
+
+    public function request_timestamp(): string {
+        /**
+         * @ignore
+         * millisecond timestamp for a signed request, as an integer string
+         * @return {string} timestamp in milliseconds
+         */
+        $timeDifference = $this->safe_integer($this->options, 'timeDifference', 0);
+        return $this->number_to_string($this->milliseconds() - $timeDifference);
     }
 
     public function is_tapi_v2(): bool {
@@ -2860,7 +2871,7 @@ class indodax extends Exchange {
             }
             $url = $url . '/api/v2/' . $this->implode_params($path, $params);
             $query = $this->urlencode($this->extend(array(
-                'timestamp' => $this->nonce(),
+                'timestamp' => $this->request_timestamp(),
                 'recvWindow' => $this->safe_integer($this->options, 'recvWindow', 5000),
             ), $params));
             $signature = $this->hmac($this->encode($query), $this->encode($this->secret), 'sha256');
@@ -2878,8 +2889,8 @@ class indodax extends Exchange {
             $this->check_required_credentials();
             $body = $this->urlencode($this->extend(array(
                 'method' => $path,
-                'timestamp' => $this->nonce(),
-                'recvWindow' => $this->options['recvWindow'],
+                'timestamp' => $this->request_timestamp(),
+                'recvWindow' => $this->safe_integer($this->options, 'recvWindow', 5000),
             ), $params));
             $headers = array(
                 'Content-Type' => 'application/x-www-form-urlencoded',
@@ -2888,6 +2899,32 @@ class indodax extends Exchange {
             );
         }
         return array( 'url' => $url, 'method' => $method, 'body' => $body, 'headers' => $headers );
+    }
+
+    public function request(mixed $path, $api = 'public', $method = 'GET', $params = array(), mixed $headers = null, mixed $body = null, mixed $config = array()): mixed {
+        /**
+         * @ignore
+         * send a request and retry once when the exchange rejects the timestamp
+         * @param {string} $path endpoint $path
+         * @param {string} [$api] $api section, public, private, or v2
+         * @param {string} [$method] http $method
+         * @param {array} [$params] request parameters
+         * @param {array} [$headers] request $headers
+         * @param {string} [$body] request $body
+         * @param {array} [$config] request $config
+         * @return {array} the exchange response
+         */
+        try {
+            return $this->fetch2($path, $api, $method, $params, $headers, $body, $config);
+        } catch (Exception $e) {
+            $adjusted = $this->safe_bool($this->options, 'timestampAdjusted', false);
+            if (($api === 'public') || $adjusted || !($e instanceof InvalidNonce)) {
+                throw $e;
+            }
+            $this->options['timestampAdjusted'] = true;
+            $this->load_time_difference();
+            return $this->fetch2($path, $api, $method, $params, $headers, $body, $config);
+        }
     }
 
     public function handle_errors(int $code, string $reason, string $url, string $method, array $headers, string $body, mixed $response, mixed $requestHeaders, mixed $requestBody) {
@@ -2938,6 +2975,10 @@ class indodax extends Exchange {
             }
         }
         $feedback = $this->id . ' ' . $body;
+        $errorCodeText = $this->safe_string($response, 'error_code');
+        if ($errorCodeText !== null) {
+            $this->throw_exactly_matched_exception($this->exceptions['exact'], $errorCodeText, $feedback);
+        }
         $this->throw_exactly_matched_exception($this->exceptions['exact'], $error, $feedback);
         $this->throw_broadly_matched_exception($this->exceptions['broad'], $error, $feedback);
         throw new ExchangeError($feedback); // unknown message

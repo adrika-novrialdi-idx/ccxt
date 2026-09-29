@@ -138,6 +138,7 @@ impl crate::exchange_generated::ExchangeBase for IndodaxCore {
                 "parse_v2_transaction" => self.parse_v2_transaction(args.get(0).cloned().unwrap_or(crate::Value::Null), &args[1.min(args.len())..]),
                 "place_order_v2" => self.place_order_v2(args.get(0).cloned().unwrap_or(crate::Value::Null), args.get(1).cloned().unwrap_or(crate::Value::Null), args.get(2).cloned().unwrap_or(crate::Value::Null), args.get(3).cloned().unwrap_or(crate::Value::Null), &args[4.min(args.len())..]).await,
                 "remove_order_v2" => self.remove_order_v2(args.get(0).cloned().unwrap_or(crate::Value::Null), &args[1.min(args.len())..]).await,
+                "request" => self.request(args.get(0).cloned().unwrap_or(crate::Value::Null), &args[1.min(args.len())..]).await,
                 "send_withdraw_v2" => self.send_withdraw_v2(args.get(0).cloned().unwrap_or(crate::Value::Null), args.get(1).cloned().unwrap_or(crate::Value::Null), args.get(2).cloned().unwrap_or(crate::Value::Null), &args[3.min(args.len())..]).await,
                 "sign" => self.sign(args.get(0).cloned().unwrap_or(crate::Value::Null), &args[1.min(args.len())..]),
                 "v1_deposit_network" => self.v1_deposit_network(args.get(0).cloned().unwrap_or(crate::Value::Null), args.get(1).cloned().unwrap_or(crate::Value::Null), args.get(2).cloned().unwrap_or(crate::Value::Null)),
@@ -553,6 +554,7 @@ impl IndodaxCore {
         m.insert("-1121".to_string(), Value::Str("BadSymbol".into()).clone());
         m.insert("-2013".to_string(), Value::Str("OrderNotFound".into()).clone());
         m.insert("-1021".to_string(), Value::Str("InvalidNonce".into()).clone());
+        m.insert("invalid_timestamp".to_string(), Value::Str("InvalidNonce".into()).clone());
         m.insert("-1022".to_string(), Value::Str("AuthenticationError".into()).clone());
         m.insert("-1002".to_string(), Value::Str("AuthenticationError".into()).clone());
         m.insert("-2014".to_string(), Value::Str("AuthenticationError".into()).clone());
@@ -729,6 +731,18 @@ impl IndodaxCore {
         return subtract(&self.milliseconds(), &self.options.as_map().and_then(|__m| __m.get("timeDifference")).cloned().unwrap_or(Value::Null));
 
     Value::Null
+}
+
+/*
+ * @ignore
+ * @method
+ * @name indodax#requestTimestamp
+ * @description millisecond timestamp for a signed request, as an integer string
+ * @returns {string} timestamp in milliseconds
+ */
+    pub fn request_timestamp(&self) -> Option<String> {
+        let mut timeDifference: Value = self.safe_integer_k(self.options.clone(), "timeDifference", &[Value::Int(0)]);
+        return self.number_to_string((match (&(self.milliseconds()), &(timeDifference)) { (Value::Int(x), Value::Int(y)) => Value::Int(x - y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 - *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x - *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x - y), _ => Value::Null })).as_str().map(str::to_owned);
 }
 
 /*
@@ -3855,7 +3869,7 @@ impl IndodaxCore {
             url = Value::Str(format!("{}{}", add(&url, &Value::Str("/api/v2/".into())), self.implode_params(path.clone(), params.clone())).into());
             let __ws_arg_29 = self.extend(Value::Map({
                 let mut m = indexmap::IndexMap::new();
-                    m.insert("timestamp".to_string(), self.nonce());
+                    m.insert("timestamp".to_string(), self.request_timestamp().map(|__s| Value::Str(__s.into())).unwrap_or(Value::Null));
                     m.insert("recvWindow".to_string(), self.safe_integer_k(self.options.clone(), "recvWindow", &[Value::Int(5000)]));
                 m
             }), &[params.clone()]);
@@ -3878,8 +3892,8 @@ impl IndodaxCore {
             let __ws_arg_30 = self.extend(Value::Map({
                 let mut m = indexmap::IndexMap::new();
                     m.insert("method".to_string(), path);
-                    m.insert("timestamp".to_string(), self.nonce());
-                    m.insert("recvWindow".to_string(), crate::value::get_value_k(&self.options, "recvWindow"));
+                    m.insert("timestamp".to_string(), self.request_timestamp().map(|__s| Value::Str(__s.into())).unwrap_or(Value::Null));
+                    m.insert("recvWindow".to_string(), self.safe_integer_k(self.options.clone(), "recvWindow", &[Value::Int(5000)]));
                 m
             }), &[params]);
             body = self.urlencode(__ws_arg_30, &[]);
@@ -3899,6 +3913,49 @@ impl IndodaxCore {
         m.insert("headers".to_string(), headers);
     m
 });
+
+    Value::Null
+}
+
+/*
+ * @ignore
+ * @method
+ * @name indodax#request
+ * @description send a request and retry once when the exchange rejects the timestamp
+ * @param {string} path endpoint path
+ * @param {string} [api] api section, public, private, or v2
+ * @param {string} [method] http method
+ * @param {object} [params] request parameters
+ * @param {object} [headers] request headers
+ * @param {string} [body] request body
+ * @param {object} [config] request config
+ * @returns {object} the exchange response
+ */
+    pub async fn request(&mut self, mut path: Value, optional_args: &[Value]) -> Value {
+        let mut api = get_arg(optional_args, 0, Value::Str("public".into()));
+        let mut method = get_arg(optional_args, 1, Value::Str("GET".into()));
+        let mut params = get_arg(optional_args, 2, Value::Map({
+    let mut m = indexmap::IndexMap::new();
+    m
+}));
+        let mut headers = get_arg(optional_args, 3, Value::Null);
+        let mut body = get_arg(optional_args, 4, Value::Null);
+        let mut config = get_arg(optional_args, 5, Value::Map({
+    let mut m = indexmap::IndexMap::new();
+    m
+}));
+        let _try_result = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(async {
+            return self.fetch2(path.clone(), &[api.clone(), method.clone(), params.clone(), headers.clone(), body.clone(), config.clone()]).await;
+         #[allow(unreachable_code)] { Value::Null }})).await;
+match _try_result { Ok(__try_ok) => { if !matches!(__try_ok, Value::Null) { return __try_ok; } return Value::Null; } Err(_try_err) => { let e: Value = panic_to_value(_try_err); 
+            let mut adjusted: Value = self.safe_bool_k(self.options.clone(), "timestampAdjusted", &[Value::Bool(false)]);
+            if (api.as_str() == Some("public")) || adjusted.as_bool() == Some(true) || !(is_instance(&e, &Value::Str("InvalidNonce".into()))) {
+                panic!("{}", e);
+            }
+            if let Value::Dict(__d) = &mut self.options { std::sync::Arc::make_mut(__d).insert("timestampAdjusted".into(), Value::Bool(true)); }
+            self.load_time_difference(&[]).await;
+            return self.fetch2(path, &[api, method, params, headers, body, config]).await;
+         } }
 
     Value::Null
 }
@@ -3951,6 +4008,10 @@ impl IndodaxCore {
             }
         }
         let mut feedback: Value = Value::Str(format!("{}{}", Value::Str(format!("{}{}", self.id.clone(), Value::Str(" ".into())).into()), body).into());
+        let mut errorCodeText: Value = self.safe_string_k(response, "error_code", &[]);
+        if (errorCodeText != Value::Null) {
+            self.throw_exactly_matched_exception(self.exceptions.as_map().and_then(|__m| __m.get("exact")).cloned().unwrap_or(Value::Null), errorCodeText, feedback.clone());
+        }
         self.throw_exactly_matched_exception(self.exceptions.as_map().and_then(|__m| __m.get("exact")).cloned().unwrap_or(Value::Null), error.clone(), feedback.clone());
         self.throw_broadly_matched_exception(self.exceptions.as_map().and_then(|__m| __m.get("broad")).cloned().unwrap_or(Value::Null), error, feedback.clone());
         panic!("{}", crate::exchange_errors::exchange_error(feedback));

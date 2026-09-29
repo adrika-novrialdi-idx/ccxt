@@ -292,6 +292,7 @@ public partial class indodax : Exchange
                     { "-1121", typeof(BadSymbol) },
                     { "-2013", typeof(OrderNotFound) },
                     { "-1021", typeof(InvalidNonce) },
+                    { "invalid_timestamp", typeof(InvalidNonce) },
                     { "-1022", typeof(AuthenticationError) },
                     { "-1002", typeof(AuthenticationError) },
                     { "-2014", typeof(AuthenticationError) },
@@ -428,6 +429,19 @@ public partial class indodax : Exchange
     public override Int64 nonce()
     {
         return ((Int64)((object)(subtract(this.milliseconds(), (this.options.ContainsKey("timeDifference") ? this.options["timeDifference"] : null))))!);
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#requestTimestamp
+     * @description millisecond timestamp for a signed request, as an integer string
+     * @returns {string} timestamp in milliseconds
+     */
+    public virtual object requestTimestamp()
+    {
+        Int64? timeDifference = this.safeInteger(this.options, "timeDifference", 0);
+        return this.numberToString(subtract(this.milliseconds(), timeDifference));
     }
 
     /**
@@ -3278,7 +3292,7 @@ public partial class indodax : Exchange
             }
             url = add(add(url, "/api/v2/"), this.implodeParams(path, parameters));
             string query = this.urlencode(this.extend(new Dictionary<string, object>() {
-                { "timestamp", this.nonce() },
+                { "timestamp", this.requestTimestamp() },
                 { "recvWindow", this.safeInteger(this.options, "recvWindow", 5000) },
             }, parameters));
             string signature = this.hmac(this.encode(query), this.encode(this.secret), sha256);
@@ -3299,8 +3313,8 @@ public partial class indodax : Exchange
             this.checkRequiredCredentials();
             body = this.urlencode(this.extend(new Dictionary<string, object>() {
                 { "method", path },
-                { "timestamp", this.nonce() },
-                { "recvWindow", (this.options.ContainsKey("recvWindow") ? this.options["recvWindow"] : null) },
+                { "timestamp", this.requestTimestamp() },
+                { "recvWindow", this.safeInteger(this.options, "recvWindow", 5000) },
             }, parameters));
             headers = new Dictionary<string, object>() {
                 { "Content-Type", "application/x-www-form-urlencoded" },
@@ -3314,6 +3328,42 @@ public partial class indodax : Exchange
             { "body", body },
             { "headers", headers },
         };
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#request
+     * @description send a request and retry once when the exchange rejects the timestamp
+     * @param {string} path endpoint path
+     * @param {string} [api] api section, public, private, or v2
+     * @param {string} [method] http method
+     * @param {object} [params] request parameters
+     * @param {object} [headers] request headers
+     * @param {string} [body] request body
+     * @param {object} [config] request config
+     * @returns {object} the exchange response
+     */
+    public async override Task<object> request(object path, object api = null, object method = null, object parameters = null, object headers = null, object body = null, object config = null)
+    {
+        api ??= "public";
+        method ??= "GET";
+        parameters ??= new Dictionary<string, object>();
+        config ??= new Dictionary<string, object>();
+        try
+        {
+            return await this.fetch2(path, api, method, parameters, headers, body, config);
+        } catch(Exception e)
+        {
+            bool? adjusted = this.safeBool(this.options, "timestampAdjusted", false);
+            if ((isEqual(api, "public")) || (adjusted == true) || !(e is InvalidNonce))
+            {
+                throw e;
+            }
+            ((IDictionary<string,object>)this.options)["timestampAdjusted"] = true;
+            await this.loadTimeDifference();
+            return await this.fetch2(path, api, method, parameters, headers, body, config);
+        }
     }
 
     public override object handleErrors(object code, object reason, object url, object method, object headers, object body, object response, object requestHeaders, object requestBody)
@@ -3377,6 +3427,11 @@ public partial class indodax : Exchange
             }
         }
         string feedback = ((this.id + " ") + (body));
+        string? errorCodeText = this.safeString(response, "error_code");
+        if ((errorCodeText != null))
+        {
+            this.throwExactlyMatchedException((this.exceptions != null && ((IDictionary<string, object>)this.exceptions).ContainsKey("exact") ? ((IDictionary<string, object>)this.exceptions)["exact"] : null), errorCodeText, feedback);
+        }
         this.throwExactlyMatchedException((this.exceptions != null && ((IDictionary<string, object>)this.exceptions).ContainsKey("exact") ? ((IDictionary<string, object>)this.exceptions)["exact"] : null), error, feedback);
         this.throwBroadlyMatchedException((this.exceptions != null && ((IDictionary<string, object>)this.exceptions).ContainsKey("broad") ? ((IDictionary<string, object>)this.exceptions)["broad"] : null), error, feedback);
         throw new ExchangeError ((string)feedback) ;

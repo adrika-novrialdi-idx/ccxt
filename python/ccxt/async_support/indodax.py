@@ -240,6 +240,7 @@ class indodax(Exchange, ImplicitAPI):
                     '-1121': BadSymbol,
                     '-2013': OrderNotFound,
                     '-1021': InvalidNonce,
+                    'invalid_timestamp': InvalidNonce,
                     '-1022': AuthenticationError,
                     '-1002': AuthenticationError,
                     '-2014': AuthenticationError,
@@ -386,6 +387,15 @@ class indodax(Exchange, ImplicitAPI):
 
     def nonce(self) -> float:
         return self.milliseconds() - self.options['timeDifference']
+
+    def request_timestamp(self) -> str:
+        """
+ @ignore
+        millisecond timestamp for a signed request, as an integer string
+        :returns str: timestamp in milliseconds
+        """
+        timeDifference = self.safe_integer(self.options, 'timeDifference', 0)
+        return self.number_to_string(self.milliseconds() - timeDifference)
 
     def is_tapi_v2(self) -> bool:
         """
@@ -2621,7 +2631,7 @@ class indodax(Exchange, ImplicitAPI):
                 url = sandboxUrl
             url = url + '/api/v2/' + self.implode_params(path, params)
             query = self.urlencode(self.extend({
-                'timestamp': self.nonce(),
+                'timestamp': self.request_timestamp(),
                 'recvWindow': self.safe_integer(self.options, 'recvWindow', 5000),
             }, params))
             signature = self.hmac(self.encode(query), self.encode(self.secret), hashlib.sha256)
@@ -2638,8 +2648,8 @@ class indodax(Exchange, ImplicitAPI):
             self.check_required_credentials()
             body = self.urlencode(self.extend({
                 'method': path,
-                'timestamp': self.nonce(),
-                'recvWindow': self.options['recvWindow'],
+                'timestamp': self.request_timestamp(),
+                'recvWindow': self.safe_integer(self.options, 'recvWindow', 5000),
             }, params))
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -2647,6 +2657,29 @@ class indodax(Exchange, ImplicitAPI):
                 'Sign': self.hmac(self.encode(body), self.encode(self.secret), hashlib.sha512),
             }
         return {'url': url, 'method': method, 'body': body, 'headers': headers}
+
+    async def request(self, path: object, api='public', method='GET', params: dict = {}, headers: object = None, body: object = None, config: object = {}) -> object:
+        """
+ @ignore
+        send a request and retry once when the exchange rejects the timestamp
+        :param str path: endpoint path
+        :param str [api]: api section, public, private, or v2
+        :param str [method]: http method
+        :param dict [params]: request parameters
+        :param dict [headers]: request headers
+        :param str [body]: request body
+        :param dict [config]: request config
+        :returns dict: the exchange response
+        """
+        try:
+            return await self.fetch2(path, api, method, params, headers, body, config)
+        except Exception as e:
+            adjusted = self.safe_bool(self.options, 'timestampAdjusted', False)
+            if (api == 'public') or adjusted or not (isinstance(e, InvalidNonce)):
+                raise e
+            self.options['timestampAdjusted'] = True
+            await self.load_time_difference()
+            return await self.fetch2(path, api, method, params, headers, body, config)
 
     def handle_errors(self, code: int, reason: str, url: str, method: str, headers: dict, body: str, response: object, requestHeaders: object, requestBody: object):
         if response is None:
@@ -2685,6 +2718,9 @@ class indodax(Exchange, ImplicitAPI):
             else:
                 return None
         feedback = self.id + ' ' + body
+        errorCodeText = self.safe_string(response, 'error_code')
+        if errorCodeText is not None:
+            self.throw_exactly_matched_exception(self.exceptions['exact'], errorCodeText, feedback)
         self.throw_exactly_matched_exception(self.exceptions['exact'], error, feedback)
         self.throw_broadly_matched_exception(self.exceptions['broad'], error, feedback)
         raise ExchangeError(feedback)  # unknown message
