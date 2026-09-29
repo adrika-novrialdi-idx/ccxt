@@ -3076,9 +3076,9 @@ class NewTranspiler {
 
     createReturnStatement(methodName: string,  unwrappedType:string ) {
 
-        // custom handling for now
-        if (methodName === 'fetchTime'){
-            return `(res).(int64)`;
+        // SafeInteger returns *int64; a bare int64 assertion panics in the sync wrapper
+        if (methodName === 'fetchTime') {
+            return `SafeInt(res)`;
         }
 
         if (unwrappedType === 'float64') {
