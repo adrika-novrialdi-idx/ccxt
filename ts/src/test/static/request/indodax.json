@@ -194,6 +194,22 @@
                 }
             }
         ],
+        "fetchTradingFees": [
+            {
+                "description": "public pair fees",
+                "method": "fetchTradingFees",
+                "url": "https://indodax.com/api/pairs",
+                "input": []
+            }
+        ],
+        "fetchTradingLimits": [
+            {
+                "description": "public pair limits",
+                "method": "fetchTradingLimits",
+                "url": "https://indodax.com/api/pairs",
+                "input": []
+            }
+        ],
         "withdraw": [
             {
                 "description": "TAPI v2 fiat withdraw request shape",
