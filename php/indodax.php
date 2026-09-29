@@ -1778,7 +1778,7 @@ class indodax extends Exchange {
          * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
          * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-$address
          *
-         * @param {string[]} [$codes] list of unified currency $codes, default is null
+         * @param {string[]} [$codes] list of unified currency $codes, required when options.tapiVersion is "2"
          * @param {array} [$params] extra parameters specific to the exchange API endpoint
          * @param {string} [$params->network] unified $network $code, only used when options.tapiVersion is "2"
          * @return {array} a list of ~@link https://docs.ccxt.com/?id=$address-structure $address structures~
@@ -2353,10 +2353,17 @@ class indodax extends Exchange {
     public function deposit_addresses_v2(?array $codes = null, $params = array()): array {
         /**
          * @ignore
-         * @param {string[]} [$codes] unified $currency $codes
+         * @param {string[]} $codes unified $currency $codes, required because each TAPI v2 query needs a coin
          * @param {array} [$params] extra parameters
          * @return {array[]} a list of $address structures
          */
+        if ($codes === null) {
+            throw new ArgumentsRequired($this->id . ' fetchDepositAddresses() requires symbols like BTC');
+        }
+        $numCodes = count($codes);
+        if ($numCodes < 1) {
+            throw new ArgumentsRequired($this->id . ' fetchDepositAddresses() requires symbols like BTC');
+        }
         if ($this->markets === null) {
             $this->load_markets();
         }

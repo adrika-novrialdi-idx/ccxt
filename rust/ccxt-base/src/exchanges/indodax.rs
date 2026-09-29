@@ -2431,7 +2431,7 @@ impl IndodaxCore {
  * @description fetch deposit addresses for multiple currencies and chain types
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
- * @param {string[]} [codes] list of unified currency codes, default is undefined
+ * @param {string[]} [codes] list of unified currency codes, required when options.tapiVersion is "2"
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
  * @returns {object} a list of [address structures]{@link https://docs.ccxt.com/?id=address-structure}
@@ -3181,7 +3181,7 @@ impl IndodaxCore {
  * @ignore
  * @method
  * @name indodax#depositAddressesV2
- * @param {string[]} [codes] unified currency codes
+ * @param {string[]} codes unified currency codes, required because each TAPI v2 query needs a coin
  * @param {object} [params] extra parameters
  * @returns {object[]} a list of address structures
  */
@@ -3191,6 +3191,13 @@ impl IndodaxCore {
     let mut m = indexmap::IndexMap::new();
     m
 }));
+        if (codes == Value::Null) {
+            panic!("{}", crate::exchange_errors::arguments_required(format!("{}{}", self.id.clone(), Value::Str(" fetchDepositAddresses() requires symbols like BTC".into()))));
+        }
+        let mut numCodes: f64 = ((codes.len() as i64) as f64);
+        if numCodes < ((1i64) as f64) {
+            panic!("{}", crate::exchange_errors::arguments_required(format!("{}{}", self.id.clone(), Value::Str(" fetchDepositAddresses() requires symbols like BTC".into()))));
+        }
         if (self.markets.clone() == Value::Null) {
             self.load_markets(&[]).await;
         }

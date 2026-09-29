@@ -2271,7 +2271,7 @@ func (this *Indodax) fetchDepositAddressBody(ch chan any, code any, optionalArgs
  * @description fetch deposit addresses for multiple currencies and chain types
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
- * @param {string[]} [codes] list of unified currency codes, default is undefined
+ * @param {string[]} [codes] list of unified currency codes, required when options.tapiVersion is "2"
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
  * @returns {object} a list of [address structures]{@link https://docs.ccxt.com/?id=address-structure}
@@ -3085,7 +3085,7 @@ func (this *Indodax) V2CurrencyCodes(optionalArgs ...any) any {
  * @ignore
  * @method
  * @name indodax#depositAddressesV2
- * @param {string[]} [codes] unified currency codes
+ * @param {string[]} codes unified currency codes, required because each TAPI v2 query needs a coin
  * @param {object} [params] extra parameters
  * @returns {object[]} a list of address structures
  */
@@ -3101,10 +3101,17 @@ func (this *Indodax) depositAddressesV2Body(ch chan any, optionalArgs ...any) an
 	_ = codes
 	params := GetArg(optionalArgs, 1, map[string]any{})
 	_ = params
+	if codes == nil {
+		panic(ArgumentsRequired(this.Id + " fetchDepositAddresses() requires symbols like BTC"))
+	}
+	var numCodes int = GetArrayLength(codes)
+	if numCodes < 1 {
+		panic(ArgumentsRequired(this.Id + " fetchDepositAddresses() requires symbols like BTC"))
+	}
 	if this.Markets == nil {
 
-		retRes239612 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes239612)
+		retRes240312 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes240312)
 	}
 	var networkCode any = nil
 	networkCodeparamsVariable := this.HandleNetworkCodeAndParams(params)
@@ -3394,8 +3401,8 @@ func (this *Indodax) fetchDepositsBody(ch chan any, optionalArgs ...any) any {
 	}
 	if this.Markets == nil {
 
-		retRes259312 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes259312)
+		retRes260012 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes260012)
 	}
 	var until *int64 = this.SafeInteger(params, "until")
 	params = this.Omit(params, []any{"until"})
@@ -3457,8 +3464,8 @@ func (this *Indodax) fetchWithdrawalsBody(ch chan any, optionalArgs ...any) any 
 	}
 	if this.Markets == nil {
 
-		retRes262812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes262812)
+		retRes263512 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes263512)
 	}
 	var until *int64 = this.SafeInteger(params, "until")
 	params = this.Omit(params, []any{"until"})
@@ -3584,8 +3591,8 @@ func (this *Indodax) sendWithdrawV2Body(ch chan any, code any, amount any, addre
 	params = GetValue(tagparamsVariable, 1)
 	if this.Markets == nil {
 
-		retRes271712 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes271712)
+		retRes272412 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes272412)
 	}
 	var currency map[string]any = MapTyped(this.Currency(code))
 	if GetValue(currency, "code") == "IDR" {
@@ -4330,7 +4337,7 @@ func (this *Indodax) FetchDepositAddress(code string, options ...FetchDepositAdd
  * @description fetch deposit addresses for multiple currencies and chain types
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
- * @param {string[]} [codes] list of unified currency codes, default is undefined
+ * @param {string[]} [codes] list of unified currency codes, required when options.tapiVersion is "2"
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
  * @returns {object} a list of [address structures]{@link https://docs.ccxt.com/?id=address-structure}

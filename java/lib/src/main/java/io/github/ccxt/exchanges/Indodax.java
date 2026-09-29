@@ -2166,7 +2166,7 @@ public class Indodax extends IndodaxApi
      * @description fetch deposit addresses for multiple currencies and chain types
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
-     * @param {string[]} [codes] list of unified currency codes, default is undefined
+     * @param {string[]} [codes] list of unified currency codes, required when options.tapiVersion is "2"
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
      * @returns {object} a list of [address structures]{@link https://docs.ccxt.com/?id=address-structure}
@@ -2942,7 +2942,7 @@ public class Indodax extends IndodaxApi
      * @ignore
      * @method
      * @name indodax#depositAddressesV2
-     * @param {string[]} [codes] unified currency codes
+     * @param {string[]} codes unified currency codes, required because each TAPI v2 query needs a coin
      * @param {object} [params] extra parameters
      * @returns {object[]} a list of address structures
      */
@@ -2953,6 +2953,15 @@ public class Indodax extends IndodaxApi
 
             Object codes = optionalArgs != null && optionalArgs.length > 0 ? optionalArgs[0] : null;
             Object parameters = optionalArgs != null && optionalArgs.length > 1 ? optionalArgs[1] : new HashMap<String, Object>() {{}};
+            if (java.util.Objects.equals(codes, null))
+            {
+                throw new ArgumentsRequired((this.id + " fetchDepositAddresses() requires symbols like BTC")) ;
+            }
+            Object numCodes = ((List<?>)codes).size();
+            if (Helpers.isLessThan(numCodes, 1))
+            {
+                throw new ArgumentsRequired((this.id + " fetchDepositAddresses() requires symbols like BTC")) ;
+            }
             if (java.util.Objects.equals(this.markets, null))
             {
                 (this.loadMarkets()).join();

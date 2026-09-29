@@ -1685,7 +1685,7 @@ class indodax(Exchange, ImplicitAPI):
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
         https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
 
-        :param str[] [codes]: list of unified currency codes, default is None
+        :param str[] [codes]: list of unified currency codes, required when options.tapiVersion is "2"
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :param str [params.network]: unified network code, only used when options.tapiVersion is "2"
         :returns dict: a list of `address structures <https://docs.ccxt.com/?id=address-structure>`
@@ -2185,10 +2185,15 @@ class indodax(Exchange, ImplicitAPI):
     def deposit_addresses_v2(self, codes: Strings = None, params: dict = {}) -> list[DepositAddress]:
         """
  @ignore
-        :param str[] [codes]: unified currency codes
+        :param str[] codes: unified currency codes, required because each TAPI v2 query needs a coin
         :param dict [params]: extra parameters
         :returns dict[]: a list of address structures
         """
+        if codes is None:
+            raise ArgumentsRequired(self.id + ' fetchDepositAddresses() requires symbols like BTC')
+        numCodes = len(codes)
+        if numCodes < 1:
+            raise ArgumentsRequired(self.id + ' fetchDepositAddresses() requires symbols like BTC')
         if self.markets is None:
             self.load_markets()
         networkCode = None
