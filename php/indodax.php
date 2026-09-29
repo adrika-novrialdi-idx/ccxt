@@ -39,6 +39,8 @@ class indodax extends Exchange {
                 'createStopLimitOrder' => false,
                 'createStopMarketOrder' => false,
                 'createStopOrder' => false,
+                'editOrder' => false,
+                'fetchAccounts' => false,
                 'fetchAllGreeks' => false,
                 'fetchBalance' => true,
                 'fetchBorrowInterest' => false,
@@ -62,6 +64,7 @@ class indodax extends Exchange {
                 'fetchFundingHistory' => false,
                 'fetchFundingInterval' => false,
                 'fetchFundingIntervals' => false,
+                'fetchFundingLimits' => false,
                 'fetchFundingRate' => false,
                 'fetchFundingRateHistory' => false,
                 'fetchFundingRates' => false,
@@ -70,6 +73,7 @@ class indodax extends Exchange {
                 'fetchIsolatedBorrowRate' => false,
                 'fetchIsolatedBorrowRates' => false,
                 'fetchIsolatedPositions' => false,
+                'fetchLedger' => false,
                 'fetchLeverage' => false,
                 'fetchLeverages' => false,
                 'fetchLeverageTiers' => false,
@@ -113,7 +117,8 @@ class indodax extends Exchange {
                 'fetchTime' => true,
                 'fetchTrades' => true,
                 'fetchTradingFee' => false,
-                'fetchTradingFees' => false,
+                'fetchTradingFees' => true,
+                'fetchTradingLimits' => true,
                 'fetchTransactionFee' => true,
                 'fetchTransactionFees' => false,
                 'fetchTransactions' => 'emulated',
@@ -407,6 +412,61 @@ class indodax extends Exchange {
         return $this->safe_integer($response, 'server_time');
     }
 
+    public function pair_price_step(array $market, ?string $increment = null): ?string {
+        /**
+         * @ignore
+         * tick size for a public pair
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+         *
+         * @param {array} $market raw pair from GET /api/pairs
+         * @param {string} [$increment] price step from GET /api/price_increments
+         * @return {string} tick size
+         */
+        if (($increment !== null) && ($increment !== '')) {
+            return $increment;
+        }
+        $pricescale = $this->safe_string($market, 'pricescale');
+        if ($pricescale !== null) {
+            return $pricescale;
+        }
+        $pricePrecision = $this->safe_string($market, 'price_precision');
+        if ($pricePrecision !== null) {
+            return $pricePrecision;
+        }
+        return $this->parse_precision($this->safe_string($market, 'price_round'));
+    }
+
+    public function parse_public_trading_fee(array $market) {
+        /**
+         * @ignore
+         * parse the public pair fee, which is not an account fee tier
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+         *
+         * @param {array} $market raw pair from GET /api/pairs
+         * @return {array} a trading fee structure, or null when the pair has no fee fields
+         */
+        $takerPercent = $this->safe_string_2($market, 'trade_fee_percent_taker', 'trade_fee_percent');
+        $makerPercent = $this->safe_string_2($market, 'trade_fee_percent_maker', 'trade_fee_percent');
+        if (($takerPercent === null) && ($makerPercent === null)) {
+            return null;
+        }
+        $baseId = $this->safe_string($market, 'traded_currency');
+        $quoteId = $this->safe_string($market, 'base_currency');
+        $base = $this->safe_currency_code($baseId);
+        $quote = $this->safe_currency_code($quoteId);
+        return array(
+            'info' => $market,
+            'symbol' => $base . '/' . $quote,
+            'percentage' => true,
+            'tierBased' => false,
+            'maker' => $this->parse_number(Precise::string_div($makerPercent, '100')),
+            'taker' => $this->parse_number(Precise::string_div($takerPercent, '100')),
+        );
+    }
+
     public function fetch_markets($params = array()): array {
         /**
          * retrieves data on all markets for indodax
@@ -431,12 +491,15 @@ class indodax extends Exchange {
         //             "price_precision": 1000,
         //             "price_round": 8,
         //             "pricescale": 1000,
+        //             "quantity_increment": "0.00000001",
         //             "trade_min_base_currency": 10000,
         //             "trade_min_traded_currency": 0.00007457,
         //             "has_memo": false,
         //             "memo_name": false,
         //             "has_payment_id": false,
         //             "trade_fee_percent": 0.3,
+        //             "trade_fee_percent_maker": 0.1,
+        //             "trade_fee_percent_taker": 0.2,
         //             "url_logo": "https://indodax.com/v2/logo/svg/color/btc.svg",
         //             "url_logo_png": "https://indodax.com/v2/logo/png/color/btc.png",
         //             "is_maintenance": 0
@@ -454,6 +517,18 @@ class indodax extends Exchange {
             $quote = $this->safe_currency_code($quoteId);
             $isMaintenance = $this->safe_integer($market, 'is_maintenance');
             $inMaintenance = ($isMaintenance !== null) && ($isMaintenance !== 0);
+            $active = true;
+            if ($inMaintenance) {
+                $active = false;
+            }
+            $fee = $this->parse_public_trading_fee($market);
+            $taker = null;
+            $maker = null;
+            if ($fee !== null) {
+                $taker = $fee['taker'];
+                $maker = $fee['maker'];
+            }
+            $amountStep = $this->safe_string($market, 'quantity_increment', '0.00000001');
             $result[] = array(
                 'id' => $id,
                 'symbol' => $base . '/' . $quote,
@@ -469,20 +544,22 @@ class indodax extends Exchange {
                 'swap' => false,
                 'future' => false,
                 'option' => false,
-                'active' => $inMaintenance ? false : true,
+                'active' => $active,
                 'contract' => false,
                 'linear' => null,
                 'inverse' => null,
-                'taker' => $this->safe_number($market, 'trade_fee_percent'),
+                'taker' => $taker,
+                'maker' => $maker,
                 'contractSize' => null,
                 'expiry' => null,
                 'expiryDatetime' => null,
                 'strike' => null,
                 'optionType' => null,
                 'percentage' => true,
+                'tierBased' => false,
                 'precision' => array(
-                    'amount' => $this->parse_number('1e-8'),
-                    'price' => $this->parse_number($this->parse_precision($this->safe_string($market, 'price_round'))),
+                    'amount' => $this->parse_number($amountStep),
+                    'price' => $this->parse_number($this->pair_price_step($market)),
                     'cost' => $this->parse_number($this->parse_precision($this->safe_string($market, 'volume_precision'))),
                 ),
                 'limits' => array(
@@ -495,11 +572,11 @@ class indodax extends Exchange {
                         'max' => null,
                     ),
                     'price' => array(
-                        'min' => $this->safe_number($market, 'trade_min_base_currency'),
+                        'min' => null,
                         'max' => null,
                     ),
                     'cost' => array(
-                        'min' => null,
+                        'min' => $this->safe_number($market, 'trade_min_base_currency'),
                         'max' => null,
                     ),
                 ),
@@ -508,6 +585,120 @@ class indodax extends Exchange {
             );
         }
         return $result;
+    }
+
+    public function fetch_trading_fees($params = array()): array {
+        /**
+         * fetch the public trading fees for multiple markets
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+         *
+         * @param {array} [$params] extra parameters specific to the exchange API endpoint
+         * @return {array} a dictionary of ~@link https://docs.ccxt.com/?id=trading-$fee-structure $fee structures~ indexed by market symbols
+         */
+        $response = $this->publicGetApiPairs($params);
+        $rawMarkets = $this->to_array($response);
+        $result = array();
+        for ($i = 0; $i < count($rawMarkets); $i++) {
+            $fee = $this->parse_public_trading_fee($rawMarkets[$i]);
+            if ($fee !== null) {
+                $symbol = $this->safe_string($fee, 'symbol');
+                if ($symbol !== null) {
+                    $result[$symbol] = $fee;
+                }
+            }
+        }
+        return $result;
+    }
+
+    public function fetch_trading_limits(?array $symbols = null, $params = array()): array {
+        /**
+         * fetch the public trading limits and price steps for markets
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-$increments
+         *
+         * @param {string[]|null} $symbols unified $market $symbols
+         * @param {array} [$params] extra parameters specific to the exchange API endpoint
+         * @return {array} a dictionary of ~@link https://docs.ccxt.com/?id=trading-limits-structure trading limits structures~ indexed by $market $symbol
+         */
+        $response = $this->publicGetApiPairs($params);
+        $incrementsResponse = $this->publicGetApiPriceIncrements($params);
+        $increments = $this->safe_dict($incrementsResponse, 'increments', array());
+        $rawMarkets = $this->to_array($response);
+        $result = array();
+        for ($i = 0; $i < count($rawMarkets); $i++) {
+            $market = $rawMarkets[$i];
+            $baseId = $this->safe_string($market, 'traded_currency');
+            $quoteId = $this->safe_string($market, 'base_currency');
+            $base = $this->safe_currency_code($baseId);
+            $quote = $this->safe_currency_code($quoteId);
+            $symbol = $base . '/' . $quote;
+            if ($symbols !== null) {
+                if (!$this->in_array($symbol, $symbols)) {
+                    continue;
+                }
+            }
+            $tickerId = $this->safe_string($market, 'ticker_id');
+            $priceStep = $this->safe_string($increments, $tickerId);
+            if ($priceStep === null) {
+                $priceStep = $this->safe_string($increments, $this->safe_string($market, 'id'));
+            }
+            $amountStep = $this->safe_string($market, 'quantity_increment');
+            $result[$symbol] = array(
+                'info' => $market,
+                'precision' => array(
+                    'amount' => $this->parse_number($amountStep),
+                    'price' => $this->parse_number($this->pair_price_step($market, $priceStep)),
+                ),
+                'limits' => array(
+                    'amount' => array(
+                        'min' => $this->safe_number($market, 'trade_min_traded_currency'),
+                        'max' => null,
+                    ),
+                    'price' => array(
+                        'min' => null,
+                        'max' => null,
+                    ),
+                    'cost' => array(
+                        'min' => $this->safe_number($market, 'trade_min_base_currency'),
+                        'max' => null,
+                    ),
+                ),
+            );
+        }
+        return $result;
+    }
+
+    public function fetch_funding_limits(?array $codes = null, $params = array()): array {
+        /**
+         * fetch the deposit and withdrawal limits for a currency
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md
+         *
+         * @param {string[]|null} $codes unified currency $codes
+         * @param {array} [$params] extra parameters specific to the exchange API endpoint
+         * @return {array} a ~@link https://docs.ccxt.com/?id=funding-limits-structure funding limits structure~
+         */
+        throw new NotSupported($this->id . ' fetchFundingLimits() is not supported yet');
+    }
+
+    public function edit_order(string $id, string $symbol, string $type, string $side, ?float $amount = null, ?float $price = null, $params = array()): array {
+        /**
+         * edit a trade order
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
+         *
+         * @param {string} $id order $id
+         * @param {string} $symbol unified $symbol of the market to edit an order in
+         * @param {string} $type 'market' or 'limit'
+         * @param {string} $side 'buy' or 'sell'
+         * @param {float} [$amount] how much of the currency you want to trade in units of the base currency
+         * @param {float} [$price] the $price at which the order is to be fulfilled, in units of the quote currency
+         * @param {array} [$params] extra parameters specific to the exchange API endpoint
+         * @return {array} an ~@link https://docs.ccxt.com/?$id=order-structure order structure~
+         */
+        throw new NotSupported($this->id . ' editOrder() is not supported yet');
     }
 
     public function parse_balance(mixed $response): array {
@@ -1556,6 +1747,30 @@ class indodax extends Exchange {
         return $this->safe_string($statuses, $status, $status);
     }
 
+    public function fetch_deposit_address(string $code, $params = array()): array {
+        /**
+         * fetch the deposit address for a currency associated with this account
+         *
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+         * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+         *
+         * @param {string} $code unified currency $code
+         * @param {array} [$params] extra parameters specific to the exchange API endpoint
+         * @param {string} [$params->network] unified network $code, only used when options.tapiVersion is "2"
+         * @return {array} an ~@link https://docs.ccxt.com/?id=address-structure address structure~
+         */
+        $addresses = $this->fetch_deposit_addresses(array( $code ), $params);
+        $rows = $this->to_array($addresses);
+        for ($i = 0; $i < count($rows); $i++) {
+            $row = $rows[$i];
+            $rowCode = $this->safe_string($row, 'currency');
+            if ($rowCode === $code) {
+                return $row;
+            }
+        }
+        throw new InvalidAddress($this->id . ' fetchDepositAddress() could not find a deposit address for ' . $code . ', make sure you have created a corresponding deposit address in your wallet on the exchange website');
+    }
+
     public function fetch_deposit_addresses(?array $codes = null, $params = array()): array {
         /**
          * fetch deposit $addresses for multiple currencies and chain types
@@ -1614,9 +1829,7 @@ class indodax extends Exchange {
         $addresses = $this->safe_dict($data, 'address', array());
         $networks = $this->safe_dict($data, 'network', array());
         $addressKeys = is_array($addresses) ? array_keys($addresses) : array();
-        $result = array(
-            'info' => $data,
-        );
+        $result = array();
         for ($i = 0; $i < count($addressKeys); $i++) {
             $marketId = $addressKeys[$i];
             $code = $this->safe_currency_code($marketId);
@@ -1650,7 +1863,7 @@ class indodax extends Exchange {
                 }
                 $finalNetwork = $network; // java req
                 if ($code !== null) {
-                    $result[$code] = array(
+                    $result[] = array(
                         'info' => array(),
                         'currency' => $code,
                         'network' => $finalNetwork,
@@ -2142,7 +2355,7 @@ class indodax extends Exchange {
          * @ignore
          * @param {string[]} [$codes] unified $currency $codes
          * @param {array} [$params] extra parameters
-         * @return {array} a dictionary of $address structures
+         * @return {array[]} a list of $address structures
          */
         if ($this->markets === null) {
             $this->load_markets();
@@ -2150,9 +2363,7 @@ class indodax extends Exchange {
         $networkCode = null;
         list($networkCode, $params) = $this->handle_network_code_and_params($params);
         $currencyCodes = $this->v2_currency_codes($codes);
-        $result = array(
-            'info' => array(),
-        );
+        $result = array();
         for ($i = 0; $i < count($currencyCodes); $i++) {
             $code = $currencyCodes[$i];
             $currency = $this->currency($code);
@@ -2164,11 +2375,6 @@ class indodax extends Exchange {
             }
             $response = $this->v2GetCapitalDepositAddressList($this->extend($request, $params));
             $rows = $this->to_array($response);
-            $info = $this->safe_list($result, 'info', array());
-            for ($j = 0; $j < count($rows); $j++) {
-                $info[] = $rows[$j];
-            }
-            $result['info'] = $info;
             if (strlen($rows) < 1) {
                 continue;
             }
@@ -2178,13 +2384,16 @@ class indodax extends Exchange {
                 $this->check_address($address);
             }
             $networkId = $this->safe_string($row, 'network');
-            $result[$currency['code']] = array(
-                'info' => $row,
-                'currency' => $currency['code'],
-                'network' => $this->network_id_to_code($networkId, $currency['code']),
-                'address' => $address,
-                'tag' => $this->safe_string($row, 'tag'),
-            );
+            $currencyCode = $this->safe_string($currency, 'code');
+            if ($currencyCode !== null) {
+                $result[] = array(
+                    'info' => $row,
+                    'currency' => $currencyCode,
+                    'network' => $this->network_id_to_code($networkId, $currencyCode),
+                    'address' => $address,
+                    'tag' => $this->safe_string($row, 'tag'),
+                );
+            }
         }
         return $result;
     }

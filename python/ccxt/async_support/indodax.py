@@ -7,7 +7,7 @@ from ccxt.async_support.base.exchange import Exchange
 from ccxt.abstract.indodax import ImplicitAPI
 import hashlib
 import math
-from ccxt.base.types import Balances, Currency, DepositAddress, Int, Market, Num, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade, DepositWithdrawFee, Transaction
+from ccxt.base.types import Balances, Currency, DepositAddress, Int, Market, Num, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade, TradingFees, DepositWithdrawFee, Transaction
 from ccxt.base.errors import ExchangeError
 from ccxt.base.errors import AuthenticationError
 from ccxt.base.errors import ArgumentsRequired
@@ -56,6 +56,8 @@ class indodax(Exchange, ImplicitAPI):
                 'createStopLimitOrder': False,
                 'createStopMarketOrder': False,
                 'createStopOrder': False,
+                'editOrder': False,
+                'fetchAccounts': False,
                 'fetchAllGreeks': False,
                 'fetchBalance': True,
                 'fetchBorrowInterest': False,
@@ -79,6 +81,7 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchFundingHistory': False,
                 'fetchFundingInterval': False,
                 'fetchFundingIntervals': False,
+                'fetchFundingLimits': False,
                 'fetchFundingRate': False,
                 'fetchFundingRateHistory': False,
                 'fetchFundingRates': False,
@@ -87,6 +90,7 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchIsolatedBorrowRate': False,
                 'fetchIsolatedBorrowRates': False,
                 'fetchIsolatedPositions': False,
+                'fetchLedger': False,
                 'fetchLeverage': False,
                 'fetchLeverages': False,
                 'fetchLeverageTiers': False,
@@ -130,7 +134,8 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchTime': True,
                 'fetchTrades': True,
                 'fetchTradingFee': False,
-                'fetchTradingFees': False,
+                'fetchTradingFees': True,
+                'fetchTradingLimits': True,
                 'fetchTransactionFee': True,
                 'fetchTransactionFees': False,
                 'fetchTransactions': 'emulated',
@@ -419,6 +424,55 @@ class indodax(Exchange, ImplicitAPI):
         #
         return self.safe_integer(response, 'server_time')
 
+    def pair_price_step(self, market: dict, increment: Str = None) -> Str:
+        """
+ @ignore
+        tick size for a public pair
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+
+        :param dict market: raw pair from GET /api/pairs
+        :param str [increment]: price step from GET /api/price_increments
+        :returns str: tick size
+        """
+        if (increment is not None) and (increment != ''):
+            return increment
+        pricescale = self.safe_string(market, 'pricescale')
+        if pricescale is not None:
+            return pricescale
+        pricePrecision = self.safe_string(market, 'price_precision')
+        if pricePrecision is not None:
+            return pricePrecision
+        return self.parse_precision(self.safe_string(market, 'price_round'))
+
+    def parse_public_trading_fee(self, market: dict):
+        """
+ @ignore
+        parse the public pair fee, which is not an account fee tier
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+
+        :param dict market: raw pair from GET /api/pairs
+        :returns dict: a trading fee structure, or None when the pair has no fee fields
+        """
+        takerPercent = self.safe_string_2(market, 'trade_fee_percent_taker', 'trade_fee_percent')
+        makerPercent = self.safe_string_2(market, 'trade_fee_percent_maker', 'trade_fee_percent')
+        if (takerPercent is None) and (makerPercent is None):
+            return None
+        baseId = self.safe_string(market, 'traded_currency')
+        quoteId = self.safe_string(market, 'base_currency')
+        base = self.safe_currency_code(baseId)
+        quote = self.safe_currency_code(quoteId)
+        return {
+            'info': market,
+            'symbol': base + '/' + quote,
+            'percentage': True,
+            'tierBased': False,
+            'maker': self.parse_number(Precise.string_div(makerPercent, '100')),
+            'taker': self.parse_number(Precise.string_div(takerPercent, '100')),
+        }
+
     async def fetch_markets(self, params: dict = {}) -> list[Market]:
         """
         retrieves data on all markets for indodax
@@ -443,12 +497,15 @@ class indodax(Exchange, ImplicitAPI):
         #             "price_precision": 1000,
         #             "price_round": 8,
         #             "pricescale": 1000,
+        #             "quantity_increment": "0.00000001",
         #             "trade_min_base_currency": 10000,
         #             "trade_min_traded_currency": 0.00007457,
         #             "has_memo": false,
         #             "memo_name": false,
         #             "has_payment_id": false,
         #             "trade_fee_percent": 0.3,
+        #             "trade_fee_percent_maker": 0.1,
+        #             "trade_fee_percent_taker": 0.2,
         #             "url_logo": "https://indodax.com/v2/logo/svg/color/btc.svg",
         #             "url_logo_png": "https://indodax.com/v2/logo/png/color/btc.png",
         #             "is_maintenance": 0
@@ -466,6 +523,16 @@ class indodax(Exchange, ImplicitAPI):
             quote = self.safe_currency_code(quoteId)
             isMaintenance = self.safe_integer(market, 'is_maintenance')
             inMaintenance = (isMaintenance is not None) and (isMaintenance != 0)
+            active = True
+            if inMaintenance:
+                active = False
+            fee = self.parse_public_trading_fee(market)
+            taker = None
+            maker = None
+            if fee is not None:
+                taker = fee['taker']
+                maker = fee['maker']
+            amountStep = self.safe_string(market, 'quantity_increment', '0.00000001')
             result.append({
                 'id': id,
                 'symbol': base + '/' + quote,
@@ -481,20 +548,22 @@ class indodax(Exchange, ImplicitAPI):
                 'swap': False,
                 'future': False,
                 'option': False,
-                'active': False if inMaintenance else True,
+                'active': active,
                 'contract': False,
                 'linear': None,
                 'inverse': None,
-                'taker': self.safe_number(market, 'trade_fee_percent'),
+                'taker': taker,
+                'maker': maker,
                 'contractSize': None,
                 'expiry': None,
                 'expiryDatetime': None,
                 'strike': None,
                 'optionType': None,
                 'percentage': True,
+                'tierBased': False,
                 'precision': {
-                    'amount': self.parse_number('1e-8'),
-                    'price': self.parse_number(self.parse_precision(self.safe_string(market, 'price_round'))),
+                    'amount': self.parse_number(amountStep),
+                    'price': self.parse_number(self.pair_price_step(market)),
                     'cost': self.parse_number(self.parse_precision(self.safe_string(market, 'volume_precision'))),
                 },
                 'limits': {
@@ -507,11 +576,11 @@ class indodax(Exchange, ImplicitAPI):
                         'max': None,
                     },
                     'price': {
-                        'min': self.safe_number(market, 'trade_min_base_currency'),
+                        'min': None,
                         'max': None,
                     },
                     'cost': {
-                        'min': None,
+                        'min': self.safe_number(market, 'trade_min_base_currency'),
                         'max': None,
                     },
                 },
@@ -519,6 +588,109 @@ class indodax(Exchange, ImplicitAPI):
                 'info': market,
             })
         return result
+
+    async def fetch_trading_fees(self, params: dict = {}) -> TradingFees:
+        """
+        fetch the public trading fees for multiple markets
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `fee structures <https://docs.ccxt.com/?id=trading-fee-structure>` indexed by market symbols
+        """
+        response = await self.publicGetApiPairs(params)
+        rawMarkets = self.to_array(response)
+        result = {}
+        for i in range(0, len(rawMarkets)):
+            fee = self.parse_public_trading_fee(rawMarkets[i])
+            if fee is not None:
+                symbol = self.safe_string(fee, 'symbol')
+                if symbol is not None:
+                    result[symbol] = fee
+        return result
+
+    async def fetch_trading_limits(self, symbols: Strings = None, params: dict = {}) -> dict:
+        """
+        fetch the public trading limits and price steps for markets
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+
+        :param str[]|None symbols: unified market symbols
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `trading limits structures <https://docs.ccxt.com/?id=trading-limits-structure>` indexed by market symbol
+        """
+        response = await self.publicGetApiPairs(params)
+        incrementsResponse = await self.publicGetApiPriceIncrements(params)
+        increments = self.safe_dict(incrementsResponse, 'increments', {})
+        rawMarkets = self.to_array(response)
+        result = {}
+        for i in range(0, len(rawMarkets)):
+            market = rawMarkets[i]
+            baseId = self.safe_string(market, 'traded_currency')
+            quoteId = self.safe_string(market, 'base_currency')
+            base = self.safe_currency_code(baseId)
+            quote = self.safe_currency_code(quoteId)
+            symbol = base + '/' + quote
+            if symbols is not None:
+                if not self.in_array(symbol, symbols):
+                    continue
+            tickerId = self.safe_string(market, 'ticker_id')
+            priceStep = self.safe_string(increments, tickerId)
+            if priceStep is None:
+                priceStep = self.safe_string(increments, self.safe_string(market, 'id'))
+            amountStep = self.safe_string(market, 'quantity_increment')
+            result[symbol] = {
+                'info': market,
+                'precision': {
+                    'amount': self.parse_number(amountStep),
+                    'price': self.parse_number(self.pair_price_step(market, priceStep)),
+                },
+                'limits': {
+                    'amount': {
+                        'min': self.safe_number(market, 'trade_min_traded_currency'),
+                        'max': None,
+                    },
+                    'price': {
+                        'min': None,
+                        'max': None,
+                    },
+                    'cost': {
+                        'min': self.safe_number(market, 'trade_min_base_currency'),
+                        'max': None,
+                    },
+                },
+            }
+        return result
+
+    async def fetch_funding_limits(self, codes: Strings = None, params: dict = {}) -> dict:
+        """
+        fetch the deposit and withdrawal limits for a currency
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md
+
+        :param str[]|None codes: unified currency codes
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a `funding limits structure <https://docs.ccxt.com/?id=funding-limits-structure>`
+        """
+        raise NotSupported(self.id + ' fetchFundingLimits() is not supported yet')
+
+    async def edit_order(self, id: str, symbol: str, type: OrderType, side: OrderSide, amount: Num = None, price: Num = None, params: dict = {}) -> Order:
+        """
+        edit a trade order
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
+
+        :param str id: order id
+        :param str symbol: unified symbol of the market to edit an order in
+        :param str type: 'market' or 'limit'
+        :param str side: 'buy' or 'sell'
+        :param float [amount]: how much of the currency you want to trade in units of the base currency
+        :param float [price]: the price at which the order is to be fulfilled, in units of the quote currency
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        raise NotSupported(self.id + ' editOrder() is not supported yet')
 
     def parse_balance(self, response: object) -> Balances:
         balances = self.safe_dict(response, 'return', {})
@@ -1485,6 +1657,27 @@ class indodax(Exchange, ImplicitAPI):
         }
         return self.safe_string(statuses, status, status)
 
+    async def fetch_deposit_address(self, code: str, params: dict = {}) -> DepositAddress:
+        """
+        fetch the deposit address for a currency associated with self account
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+
+        :param str code: unified currency code
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.network]: unified network code, only used when options.tapiVersion is "2"
+        :returns dict: an `address structure <https://docs.ccxt.com/?id=address-structure>`
+        """
+        addresses = await self.fetch_deposit_addresses([code], params)
+        rows = self.to_array(addresses)
+        for i in range(0, len(rows)):
+            row = rows[i]
+            rowCode = self.safe_string(row, 'currency')
+            if rowCode == code:
+                return row
+        raise InvalidAddress(self.id + ' fetchDepositAddress() could not find a deposit address for ' + code + ', make sure you have created a corresponding deposit address in your wallet on the exchange website')
+
     async def fetch_deposit_addresses(self, codes: Strings = None, params: dict = {}) -> list[DepositAddress]:
         """
         fetch deposit addresses for multiple currencies and chain types
@@ -1541,9 +1734,7 @@ class indodax(Exchange, ImplicitAPI):
         addresses = self.safe_dict(data, 'address', {})
         networks = self.safe_dict(data, 'network', {})
         addressKeys = list(addresses.keys())
-        result = {
-            'info': data,
-        }
+        result = []
         for i in range(0, len(addressKeys)):
             marketId = addressKeys[i]
             code = self.safe_currency_code(marketId)
@@ -1570,13 +1761,13 @@ class indodax(Exchange, ImplicitAPI):
                             network = _netIdTmp.upper()
                 finalNetwork = network  # java req
                 if code is not None:
-                    result[code] = {
+                    result.append({
                         'info': {},
                         'currency': code,
                         'network': finalNetwork,
                         'address': address,
                         'tag': None,
-                    }
+                    })
         return result
 
     async def balance_v2(self, params: dict = {}) -> Balances:
@@ -1996,16 +2187,14 @@ class indodax(Exchange, ImplicitAPI):
  @ignore
         :param str[] [codes]: unified currency codes
         :param dict [params]: extra parameters
-        :returns dict: a dictionary of address structures
+        :returns dict[]: a list of address structures
         """
         if self.markets is None:
             await self.load_markets()
         networkCode = None
         networkCode, params = self.handle_network_code_and_params(params)
         currencyCodes = self.v2_currency_codes(codes)
-        result = {
-            'info': [],
-        }
+        result = []
         for i in range(0, len(currencyCodes)):
             code = currencyCodes[i]
             currency = self.currency(code)
@@ -2016,10 +2205,6 @@ class indodax(Exchange, ImplicitAPI):
                 request['network'] = self.network_code_to_id(networkCode, code)
             response = await self.v2GetCapitalDepositAddressList(self.extend(request, params))
             rows = self.to_array(response)
-            info = self.safe_list(result, 'info', [])
-            for j in range(0, len(rows)):
-                info.append(rows[j])
-            result['info'] = info
             if len(rows) < 1:
                 continue
             row = rows[0]
@@ -2027,13 +2212,15 @@ class indodax(Exchange, ImplicitAPI):
             if address is not None:
                 self.check_address(address)
             networkId = self.safe_string(row, 'network')
-            result[currency['code']] = {
-                'info': row,
-                'currency': currency['code'],
-                'network': self.network_id_to_code(networkId, currency['code']),
-                'address': address,
-                'tag': self.safe_string(row, 'tag'),
-            }
+            currencyCode = self.safe_string(currency, 'code')
+            if currencyCode is not None:
+                result.append({
+                    'info': row,
+                    'currency': currencyCode,
+                    'network': self.network_id_to_code(networkId, currencyCode),
+                    'address': address,
+                    'tag': self.safe_string(row, 'tag'),
+                })
         return result
 
     def window_v2(self, since: Int, until: Int, maxSpan: float) -> list[object]:

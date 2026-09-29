@@ -16,6 +16,7 @@ import io.github.ccxt.types.OrderBook;
 import io.github.ccxt.types.Ticker;
 import io.github.ccxt.types.Tickers;
 import io.github.ccxt.types.Trade;
+import io.github.ccxt.types.TradingFees;
 import io.github.ccxt.types.Transaction;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,6 +65,8 @@ public class Indodax extends IndodaxApi
                 put( "createStopLimitOrder", false );
                 put( "createStopMarketOrder", false );
                 put( "createStopOrder", false );
+                put( "editOrder", false );
+                put( "fetchAccounts", false );
                 put( "fetchAllGreeks", false );
                 put( "fetchBalance", true );
                 put( "fetchBorrowInterest", false );
@@ -87,6 +90,7 @@ public class Indodax extends IndodaxApi
                 put( "fetchFundingHistory", false );
                 put( "fetchFundingInterval", false );
                 put( "fetchFundingIntervals", false );
+                put( "fetchFundingLimits", false );
                 put( "fetchFundingRate", false );
                 put( "fetchFundingRateHistory", false );
                 put( "fetchFundingRates", false );
@@ -95,6 +99,7 @@ public class Indodax extends IndodaxApi
                 put( "fetchIsolatedBorrowRate", false );
                 put( "fetchIsolatedBorrowRates", false );
                 put( "fetchIsolatedPositions", false );
+                put( "fetchLedger", false );
                 put( "fetchLeverage", false );
                 put( "fetchLeverages", false );
                 put( "fetchLeverageTiers", false );
@@ -138,7 +143,8 @@ public class Indodax extends IndodaxApi
                 put( "fetchTime", true );
                 put( "fetchTrades", true );
                 put( "fetchTradingFee", false );
-                put( "fetchTradingFees", false );
+                put( "fetchTradingFees", true );
+                put( "fetchTradingLimits", true );
                 put( "fetchTransactionFee", true );
                 put( "fetchTransactionFees", false );
                 put( "fetchTransactions", "emulated" );
@@ -509,6 +515,71 @@ public class Indodax extends IndodaxApi
     }
 
     /**
+     * @ignore
+     * @method
+     * @name indodax#pairPriceStep
+     * @description tick size for a public pair
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {object} market raw pair from GET /api/pairs
+     * @param {string} [increment] price step from GET /api/price_increments
+     * @returns {string} tick size
+     */
+    public Object pairPriceStep(Map<String, Object> market, Object... optionalArgs)
+    {
+        Object increment = optionalArgs != null && optionalArgs.length > 0 ? optionalArgs[0] : null;
+        if ((!java.util.Objects.equals(increment, null)) && (!java.util.Objects.equals(increment, "")))
+        {
+            return increment;
+        }
+        String pricescale = this.safeString(market, "pricescale");
+        if (!java.util.Objects.equals(pricescale, null))
+        {
+            return pricescale;
+        }
+        String pricePrecision = this.safeString(market, "price_precision");
+        if (!java.util.Objects.equals(pricePrecision, null))
+        {
+            return pricePrecision;
+        }
+        return this.parsePrecision(this.safeString(market, "price_round"));
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#parsePublicTradingFee
+     * @description parse the public pair fee, which is not an account fee tier
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @param {object} market raw pair from GET /api/pairs
+     * @returns {object} a trading fee structure, or undefined when the pair has no fee fields
+     */
+    public Object parsePublicTradingFee(Map<String, Object> market)
+    {
+        String takerPercent = this.safeString2(market, "trade_fee_percent_taker", "trade_fee_percent");
+        String makerPercent = this.safeString2(market, "trade_fee_percent_maker", "trade_fee_percent");
+        if ((java.util.Objects.equals(takerPercent, null)) && (java.util.Objects.equals(makerPercent, null)))
+        {
+            return null;
+        }
+        String baseId = this.safeString(market, "traded_currency");
+        String quoteId = this.safeString(market, "base_currency");
+        String base = this.safeCurrencyCode(baseId);
+        String quote = this.safeCurrencyCode(quoteId);
+        final Object finalBase = base;
+        final Object finalMakerPercent = makerPercent;
+        final Object finalTakerPercent = takerPercent;
+        return new HashMap<String, Object>() {{
+            put( "info", market );
+            put( "symbol", ((finalBase + "/") + quote) );
+            put( "percentage", true );
+            put( "tierBased", false );
+            put( "maker", Indodax.this.parseNumber(Precise.stringDiv(finalMakerPercent, "100")) );
+            put( "taker", Indodax.this.parseNumber(Precise.stringDiv(finalTakerPercent, "100")) );
+        }};
+    }
+
+    /**
      * @method
      * @name indodax#fetchMarkets
      * @description retrieves data on all markets for indodax
@@ -537,12 +608,15 @@ public class Indodax extends IndodaxApi
             //             "price_precision": 1000,
             //             "price_round": 8,
             //             "pricescale": 1000,
+            //             "quantity_increment": "0.00000001",
             //             "trade_min_base_currency": 10000,
             //             "trade_min_traded_currency": 0.00007457,
             //             "has_memo": false,
             //             "memo_name": false,
             //             "has_payment_id": false,
             //             "trade_fee_percent": 0.3,
+            //             "trade_fee_percent_maker": 0.1,
+            //             "trade_fee_percent_taker": 0.2,
             //             "url_logo": "https://indodax.com/v2/logo/svg/color/btc.svg",
             //             "url_logo_png": "https://indodax.com/v2/logo/png/color/btc.png",
             //             "is_maintenance": 0
@@ -561,7 +635,24 @@ public class Indodax extends IndodaxApi
                 String quote = this.safeCurrencyCode(quoteId);
                 Long isMaintenance = this.safeInteger(market, "is_maintenance");
                 Boolean inMaintenance = (!java.util.Objects.equals(isMaintenance, null)) && ((isMaintenance == null || isMaintenance != 0));
+                Boolean active = true;
+                if (Boolean.TRUE.equals(inMaintenance))
+                {
+                    active = false;
+                }
+                Object fee = this.parsePublicTradingFee((Map<String, Object>) (market));
+                Object taker = null;
+                Object maker = null;
+                if (!java.util.Objects.equals(fee, null))
+                {
+                    taker = Helpers.GetValue(fee, "taker");
+                    maker = Helpers.GetValue(fee, "maker");
+                }
+                String amountStep = this.safeString(market, "quantity_increment", "0.00000001");
     final Object finalBase = base;
+                final Object finalActive = active;
+                final Object finalTaker = taker;
+                final Object finalMaker = maker;
                             ((List<Object>)result).add(new HashMap<String, Object>() {{
                     put( "id", id );
                     put( "symbol", ((finalBase + "/") + quote) );
@@ -577,20 +668,22 @@ public class Indodax extends IndodaxApi
                     put( "swap", false );
                     put( "future", false );
                     put( "option", false );
-                    put( "active", ((Boolean.TRUE.equals(inMaintenance))) ? false : true );
+                    put( "active", finalActive );
                     put( "contract", false );
                     put( "linear", null );
                     put( "inverse", null );
-                    put( "taker", Indodax.this.safeNumber(market, "trade_fee_percent") );
+                    put( "taker", finalTaker );
+                    put( "maker", finalMaker );
                     put( "contractSize", null );
                     put( "expiry", null );
                     put( "expiryDatetime", null );
                     put( "strike", null );
                     put( "optionType", null );
                     put( "percentage", true );
+                    put( "tierBased", false );
                     put( "precision", new HashMap<String, Object>() {{
-                        put( "amount", Indodax.this.parseNumber("1e-8") );
-                        put( "price", Indodax.this.parseNumber(Indodax.this.parsePrecision(Indodax.this.safeString(market, "price_round"))) );
+                        put( "amount", Indodax.this.parseNumber(amountStep) );
+                        put( "price", Indodax.this.parseNumber(Indodax.this.pairPriceStep((Map<String, Object>) (market))) );
                         put( "cost", Indodax.this.parseNumber(Indodax.this.parsePrecision(Indodax.this.safeString(market, "volume_precision"))) );
                     }} );
                     put( "limits", new HashMap<String, Object>() {{
@@ -603,11 +696,11 @@ public class Indodax extends IndodaxApi
                             put( "max", null );
                         }} );
                         put( "price", new HashMap<String, Object>() {{
-                            put( "min", Indodax.this.safeNumber(market, "trade_min_base_currency") );
+                            put( "min", null );
                             put( "max", null );
                         }} );
                         put( "cost", new HashMap<String, Object>() {{
-                            put( "min", null );
+                            put( "min", Indodax.this.safeNumber(market, "trade_min_base_currency") );
                             put( "max", null );
                         }} );
                     }} );
@@ -617,6 +710,160 @@ public class Indodax extends IndodaxApi
             }
             return result;
         });
+
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchTradingFees
+     * @description fetch the public trading fees for multiple markets
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a dictionary of [fee structures]{@link https://docs.ccxt.com/?id=trading-fee-structure} indexed by market symbols
+     */
+    public CompletableFuture<TradingFees> fetchTradingFees(Object... optionalArgs)
+    {
+
+        return BaseExchange.supplyAsync(() -> {
+
+            Object parameters = optionalArgs != null && optionalArgs.length > 0 ? optionalArgs[0] : new HashMap<String, Object>() {{}};
+            List<Object> response = (this.publicGetApiPairs(parameters)).join();
+            List<Object> rawMarkets = this.toArray(response);
+            Map<String, Object> result = new HashMap<String, Object>() {{}};
+            for (var i = 0; i < ((List<?>)rawMarkets).size(); i++)
+            {
+                Object fee = this.parsePublicTradingFee((Map<String, Object>) ((rawMarkets == null || i < 0 || i >= rawMarkets.size() ? null : rawMarkets.get(i))));
+                if (!java.util.Objects.equals(fee, null))
+                {
+                    String symbol = this.safeString(fee, "symbol");
+                    if (!java.util.Objects.equals(symbol, null))
+                    {
+                        ((Map<String, Object>)result).put((String)symbol, fee);
+                    }
+                }
+            }
+            return result;
+        }).thenApply(TradingFees::new);
+
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchTradingLimits
+     * @description fetch the public trading limits and price steps for markets
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {string[]|undefined} symbols unified market symbols
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a dictionary of [trading limits structures]{@link https://docs.ccxt.com/?id=trading-limits-structure} indexed by market symbol
+     */
+    public CompletableFuture<Object> fetchTradingLimits(Object... optionalArgs)
+    {
+
+        return BaseExchange.supplyAsync(() -> {
+
+            Object symbols = optionalArgs != null && optionalArgs.length > 0 ? optionalArgs[0] : null;
+            Object parameters = optionalArgs != null && optionalArgs.length > 1 ? optionalArgs[1] : new HashMap<String, Object>() {{}};
+            List<Object> response = (this.publicGetApiPairs(parameters)).join();
+            Map<String, Object> incrementsResponse = (this.publicGetApiPriceIncrements(parameters)).join();
+            Map<String, Object> increments = (Map<String, Object>) this.safeDict(incrementsResponse, "increments", new HashMap<String, Object>() {{}});
+            List<Object> rawMarkets = this.toArray(response);
+            Map<String, Object> result = new HashMap<String, Object>() {{}};
+            for (var i = 0; i < ((List<?>)rawMarkets).size(); i++)
+            {
+                Object market = (rawMarkets == null || i < 0 || i >= rawMarkets.size() ? null : rawMarkets.get(i));
+                String baseId = this.safeString(market, "traded_currency");
+                String quoteId = this.safeString(market, "base_currency");
+                String base = this.safeCurrencyCode(baseId);
+                String quote = this.safeCurrencyCode(quoteId);
+                Object symbol = ((base + "/") + quote);
+                if (!java.util.Objects.equals(symbols, null))
+                {
+                    if (!this.inArray(symbol, symbols))
+                    {
+                        continue;
+                    }
+                }
+                String tickerId = this.safeString(market, "ticker_id");
+                String priceStep = this.safeString(increments, tickerId);
+                if (java.util.Objects.equals(priceStep, null))
+                {
+                    priceStep = this.safeString(increments, this.safeString(market, "id"));
+                }
+                String amountStep = this.safeString(market, "quantity_increment");
+                final Object finalPriceStep = priceStep;
+                ((Map<String, Object>)result).put((String)symbol, new HashMap<String, Object>() {{
+        put( "info", market );
+        put( "precision", new HashMap<String, Object>() {{
+            put( "amount", Indodax.this.parseNumber(amountStep) );
+            put( "price", Indodax.this.parseNumber(Indodax.this.pairPriceStep((Map<String, Object>) (market), finalPriceStep)) );
+        }} );
+        put( "limits", new HashMap<String, Object>() {{
+            put( "amount", new HashMap<String, Object>() {{
+                put( "min", Indodax.this.safeNumber(market, "trade_min_traded_currency") );
+                put( "max", null );
+            }} );
+            put( "price", new HashMap<String, Object>() {{
+                put( "min", null );
+                put( "max", null );
+            }} );
+            put( "cost", new HashMap<String, Object>() {{
+                put( "min", Indodax.this.safeNumber(market, "trade_min_base_currency") );
+                put( "max", null );
+            }} );
+        }} );
+    }});
+            }
+            return result;
+        });
+
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchFundingLimits
+     * @description fetch the deposit and withdrawal limits for a currency
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md
+     * @param {string[]|undefined} codes unified currency codes
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [funding limits structure]{@link https://docs.ccxt.com/?id=funding-limits-structure}
+     */
+    public CompletableFuture<Object> fetchFundingLimits(Object... optionalArgs)
+    {
+
+        return BaseExchange.supplyAsync(() -> {
+
+            Object codes = optionalArgs != null && optionalArgs.length > 0 ? optionalArgs[0] : null;
+            Object parameters = optionalArgs != null && optionalArgs.length > 1 ? optionalArgs[1] : new HashMap<String, Object>() {{}};
+            throw new NotSupported((this.id + " fetchFundingLimits() is not supported yet")) ;
+        });
+
+    }
+
+    /**
+     * @method
+     * @name indodax#editOrder
+     * @description edit a trade order
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
+     * @param {string} id order id
+     * @param {string} symbol unified symbol of the market to edit an order in
+     * @param {string} type 'market' or 'limit'
+     * @param {string} side 'buy' or 'sell'
+     * @param {float} [amount] how much of the currency you want to trade in units of the base currency
+     * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    public CompletableFuture<Order> editOrder(String id, String symbol, Object type, Object side, Object... optionalArgs)
+    {
+
+        return BaseExchange.supplyAsync(() -> {
+
+            Object amount = optionalArgs != null && optionalArgs.length > 0 ? optionalArgs[0] : null;
+            Object price = optionalArgs != null && optionalArgs.length > 1 ? optionalArgs[1] : null;
+            Object parameters = optionalArgs != null && optionalArgs.length > 2 ? optionalArgs[2] : new HashMap<String, Object>() {{}};
+            throw new NotSupported((this.id + " editOrder() is not supported yet")) ;
+        }).thenApply(Order::new);
 
     }
 
@@ -1882,6 +2129,39 @@ public class Indodax extends IndodaxApi
 
     /**
      * @method
+     * @name indodax#fetchDepositAddress
+     * @description fetch the deposit address for a currency associated with this account
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+     * @param {string} code unified currency code
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
+     * @returns {object} an [address structure]{@link https://docs.ccxt.com/?id=address-structure}
+     */
+    public CompletableFuture<DepositAddress> fetchDepositAddress(String code, Object... optionalArgs)
+    {
+
+        return BaseExchange.supplyAsync(() -> {
+
+            Object parameters = optionalArgs != null && optionalArgs.length > 0 ? optionalArgs[0] : new HashMap<String, Object>() {{}};
+            Object addresses = (this.fetchDepositAddresses((Object)(new ArrayList<Object>(Arrays.asList(code))), (Object)(parameters))).join();
+            List<Object> rows = this.toArray(addresses);
+            for (var i = 0; i < ((List<?>)rows).size(); i++)
+            {
+                Object row = (rows == null || i < 0 || i >= rows.size() ? null : rows.get(i));
+                String rowCode = this.safeString(row, "currency");
+                if (java.util.Objects.equals(rowCode, code))
+                {
+                    return row;
+                }
+            }
+            throw new InvalidAddress((((this.id + " fetchDepositAddress() could not find a deposit address for ") + code) + ", make sure you have created a corresponding deposit address in your wallet on the exchange website")) ;
+        }).thenApply(DepositAddress::new);
+
+    }
+
+    /**
+     * @method
      * @name indodax#fetchDepositAddresses
      * @description fetch deposit addresses for multiple currencies and chain types
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
@@ -1946,9 +2226,7 @@ public class Indodax extends IndodaxApi
             Map<String, Object> addresses = (Map<String, Object>) this.safeDict(data, "address", new HashMap<String, Object>() {{}});
             Map<String, Object> networks = (Map<String, Object>) this.safeDict(data, "network", new HashMap<String, Object>() {{}});
             List<Object> addressKeys = new ArrayList<Object>(addresses.keySet());
-            Object result = new HashMap<String, Object>() {{
-                put( "info", data );
-            }};
+            List<Object> result = new ArrayList<Object>(Arrays.asList());
             for (var i = 0; i < ((List<?>)addressKeys).size(); i++)
             {
                 Object marketId = (addressKeys == null || i < 0 || i >= addressKeys.size() ? null : addressKeys.get(i));
@@ -1993,15 +2271,15 @@ public class Indodax extends IndodaxApi
                     Object finalNetwork = network; // java req
                     if (!java.util.Objects.equals(code, null))
                     {
-                        final Object finalCode = code;
+    final Object finalCode = code;
                         final Object finalAddress = address;
-                        ((Map<String, Object>)result).put((String)code, new HashMap<String, Object>() {{
-        put( "info", new HashMap<String, Object>() {{}} );
-        put( "currency", finalCode );
-        put( "network", finalNetwork );
-        put( "address", finalAddress );
-        put( "tag", null );
-    }});
+                                            ((List<Object>)result).add(new HashMap<String, Object>() {{
+                            put( "info", new HashMap<String, Object>() {{}} );
+                            put( "currency", finalCode );
+                            put( "network", finalNetwork );
+                            put( "address", finalAddress );
+                            put( "tag", null );
+                        }});
                     }
                 }
             }
@@ -2036,7 +2314,7 @@ public class Indodax extends IndodaxApi
             {
                 ((Map<String, Object>)request).put("omitZeroBalances", omitZeroBalances);
             }
-            Object response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetAccount", new Object[] { this.extend(request, parameters) })).join();
+            Map<String, Object> response = (this.v2GetAccount(this.extend(request, parameters))).join();
             return this.parseBalanceV2((Map<String, Object>) (response));
         });
 
@@ -2253,7 +2531,7 @@ public class Indodax extends IndodaxApi
             Object market = (orderRequest == null || 0 >= ((List<?>)orderRequest).size() ? null : ((List<?>)orderRequest).get(0));
             Object request = (orderRequest == null || 1 >= ((List<?>)orderRequest).size() ? null : ((List<?>)orderRequest).get(1));
             parameters = (orderRequest == null || 2 >= ((List<?>)orderRequest).size() ? null : ((List<?>)orderRequest).get(2));
-            Object response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetOrder", new Object[] { this.extend(request, parameters) })).join();
+            Map<String, Object> response = (this.v2GetOrder(this.extend(request, parameters))).join();
             return this.parseOrder(response, market);
         });
 
@@ -2289,7 +2567,7 @@ public class Indodax extends IndodaxApi
                 market = this.market(symbol);
                 ((Map<String, Object>)request).put("symbol", this.tapiV2Symbol((Map<String, Object>) (market)));
             }
-            Object response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetOpenOrders", new Object[] { this.extend(request, parameters) })).join();
+            List<Object> response = (this.v2GetOpenOrders(this.extend(request, parameters))).join();
             List<Object> rows = this.toArray(response);
             return this.parseOrders(rows, market, since, limit);
         });
@@ -2365,10 +2643,10 @@ public class Indodax extends IndodaxApi
                 Object response = null;
                 if (java.util.Objects.equals(historyKind, "orders"))
                 {
-                    response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetOrderHistories", new Object[] { this.extend(request, parameters) })).join();
+                    response = (this.v2GetOrderHistories(this.extend(request, parameters))).join();
                 } else
                 {
-                    response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetMyTrades", new Object[] { this.extend(request, parameters) })).join();
+                    response = (this.v2GetMyTrades(this.extend(request, parameters))).join();
                 }
                 return this.safeList(response, "data", new ArrayList<Object>(Arrays.asList()));
             }
@@ -2402,10 +2680,10 @@ public class Indodax extends IndodaxApi
                 Object response = null;
                 if (java.util.Objects.equals(historyKind, "orders"))
                 {
-                    response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetOrderHistories", new Object[] { this.extend(request, parameters) })).join();
+                    response = (this.v2GetOrderHistories(this.extend(request, parameters))).join();
                 } else
                 {
-                    response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetMyTrades", new Object[] { this.extend(request, parameters) })).join();
+                    response = (this.v2GetMyTrades(this.extend(request, parameters))).join();
                 }
                 List<Object> rows = (List<Object>) this.safeList(response, "data", new ArrayList<Object>(Arrays.asList()));
                 for (var i = 0; i < ((List<?>)rows).size(); i++)
@@ -2588,7 +2866,7 @@ public class Indodax extends IndodaxApi
             {
                 ((Map<String, Object>)request).put("selfTradePreventionMode", selfTradePreventionMode);
             }
-            Object response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2PostOrder", new Object[] { this.extend(request, parameters) })).join();
+            Map<String, Object> response = (this.v2PostOrder(this.extend(request, parameters))).join();
             return this.parseOrder(response, market);
         });
 
@@ -2618,7 +2896,7 @@ public class Indodax extends IndodaxApi
             Object market = (orderRequest == null || 0 >= ((List<?>)orderRequest).size() ? null : ((List<?>)orderRequest).get(0));
             Object request = (orderRequest == null || 1 >= ((List<?>)orderRequest).size() ? null : ((List<?>)orderRequest).get(1));
             parameters = (orderRequest == null || 2 >= ((List<?>)orderRequest).size() ? null : ((List<?>)orderRequest).get(2));
-            Object response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2DeleteOrder", new Object[] { this.extend(request, parameters) })).join();
+            Map<String, Object> response = (this.v2DeleteOrder(this.extend(request, parameters))).join();
             return this.parseOrder(response, market);
         });
 
@@ -2666,7 +2944,7 @@ public class Indodax extends IndodaxApi
      * @name indodax#depositAddressesV2
      * @param {string[]} [codes] unified currency codes
      * @param {object} [params] extra parameters
-     * @returns {object} a dictionary of address structures
+     * @returns {object[]} a list of address structures
      */
     public CompletableFuture<Object> depositAddressesV2(Object... optionalArgs)
     {
@@ -2684,9 +2962,7 @@ public class Indodax extends IndodaxApi
             networkCode = (String) ((List<Object>) networkCodeparametersVariable).get(0);
             parameters = ((List<Object>) networkCodeparametersVariable).get(1);
             Object currencyCodes = this.v2CurrencyCodes(codes);
-            Object result = new HashMap<String, Object>() {{
-                put( "info", new ArrayList<Object>(Arrays.asList()) );
-            }};
+            List<Object> result = new ArrayList<Object>(Arrays.asList());
             for (var i = 0; i < ((List<?>)currencyCodes).size(); i++)
             {
                 Object code = (currencyCodes == null || i < 0 || i >= ((List<?>)currencyCodes).size() ? null : ((List<?>)currencyCodes).get(i));
@@ -2698,14 +2974,8 @@ public class Indodax extends IndodaxApi
                 {
                     ((Map<String, Object>)request).put("network", this.networkCodeToId(networkCode, code));
                 }
-                Object response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetCapitalDepositAddressList", new Object[] { this.extend(request, parameters) })).join();
+                List<Object> response = (this.v2GetCapitalDepositAddressList(this.extend(request, parameters))).join();
                 List<Object> rows = this.toArray(response);
-                List<Object> info = (List<Object>) this.safeList(result, "info", new ArrayList<Object>(Arrays.asList()));
-                for (var j = 0; j < ((List<?>)rows).size(); j++)
-                {
-                    ((List<Object>)info).add((rows == null || j < 0 || j >= rows.size() ? null : rows.get(j)));
-                }
-                ((Map<String, Object>)result).put("info", info);
                 if (((List<?>)rows).size() < 1)
                 {
                     continue;
@@ -2717,14 +2987,19 @@ public class Indodax extends IndodaxApi
                     this.checkAddress(address);
                 }
                 String networkId = this.safeString(row, "network");
-                final Object finalAddress = address;
-                ((Map<String, Object>)result).put((String)((Map<String, Object>)currency).get("code"), new HashMap<String, Object>() {{
-        put( "info", row );
-        put( "currency", ((Map<String, Object>)currency).get("code") );
-        put( "network", Indodax.this.networkIdToCode(networkId, ((Map<String, Object>)currency).get("code")) );
-        put( "address", finalAddress );
-        put( "tag", Indodax.this.safeString(row, "tag") );
-    }});
+                String currencyCode = this.safeString(currency, "code");
+                if (!java.util.Objects.equals(currencyCode, null))
+                {
+    final Object finalCurrencyCode = currencyCode;
+                    final Object finalAddress = address;
+                                    ((List<Object>)result).add(new HashMap<String, Object>() {{
+                        put( "info", row );
+                        put( "currency", finalCurrencyCode );
+                        put( "network", Indodax.this.networkIdToCode(networkId, finalCurrencyCode) );
+                        put( "address", finalAddress );
+                        put( "tag", Indodax.this.safeString(row, "tag") );
+                    }});
+                }
             }
             return result;
         });
@@ -2826,10 +3101,10 @@ public class Indodax extends IndodaxApi
                 Object response = null;
                 if (java.util.Objects.equals(direction, "deposit"))
                 {
-                    response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetCapitalDepositHisrec", new Object[] { this.extend(request, parameters) })).join();
+                    response = (this.v2GetCapitalDepositHisrec(this.extend(request, parameters))).join();
                 } else
                 {
-                    response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetCapitalWithdrawHistory", new Object[] { this.extend(request, parameters) })).join();
+                    response = (this.v2GetCapitalWithdrawHistory(this.extend(request, parameters))).join();
                 }
                 List<Object> rows = this.toArray(response);
                 for (var j = 0; j < ((List<?>)rows).size(); j++)
@@ -2895,7 +3170,7 @@ public class Indodax extends IndodaxApi
                 {
                     ((Map<String, Object>)request).put("limit", requestLimit);
                 }
-                Object response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2GetFiatOrders", new Object[] { this.extend(request, parameters) })).join();
+                Map<String, Object> response = (this.v2GetFiatOrders(this.extend(request, parameters))).join();
                 List<Object> rows = (List<Object>) this.safeList(response, "data", new ArrayList<Object>(Arrays.asList()));
                 for (var j = 0; j < ((List<?>)rows).size(); j++)
                 {
@@ -3120,7 +3395,7 @@ public class Indodax extends IndodaxApi
                     put( "accountInfo", Indodax.this.json(accountInfo) );
                     put( "clientRequestId", clientRequestId );
                 }};
-                Object fiatResponse = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2PostFiatWithdraw", new Object[] { this.extend(fiatRequest, parameters) })).join();
+                Map<String, Object> fiatResponse = (this.v2PostFiatWithdraw(this.extend(fiatRequest, parameters))).join();
                 Map<String, Object> data = (Map<String, Object>) this.safeDict(fiatResponse, "data", new HashMap<String, Object>() {{}});
                 String orderId = this.safeString(data, "orderId");
                 return this.parseV2Transaction((Map<String, Object>) (new HashMap<String, Object>() {{
@@ -3148,8 +3423,8 @@ public class Indodax extends IndodaxApi
             {
                 ((Map<String, Object>)request).put("network", this.networkCodeToId(networkCode, ((Map<String, Object>)currency).get("code")));
             }
-            Object response = ((CompletableFuture<Object>)Helpers.callDynamically(this, "v2PostCapitalWithdrawApply", new Object[] { this.extend(request, parameters) })).join();
-            Helpers.addElementToObject(response, "txType", "withdraw");
+            Map<String, Object> response = (this.v2PostCapitalWithdrawApply(this.extend(request, parameters))).join();
+            ((Map<String, Object>)response).put("txType", "withdraw");
             return this.parseV2Transaction((Map<String, Object>) (response), currency);
         });
 

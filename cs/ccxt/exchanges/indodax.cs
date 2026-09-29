@@ -34,6 +34,8 @@ public partial class indodax : Exchange
                 { "createStopLimitOrder", false },
                 { "createStopMarketOrder", false },
                 { "createStopOrder", false },
+                { "editOrder", false },
+                { "fetchAccounts", false },
                 { "fetchAllGreeks", false },
                 { "fetchBalance", true },
                 { "fetchBorrowInterest", false },
@@ -57,6 +59,7 @@ public partial class indodax : Exchange
                 { "fetchFundingHistory", false },
                 { "fetchFundingInterval", false },
                 { "fetchFundingIntervals", false },
+                { "fetchFundingLimits", false },
                 { "fetchFundingRate", false },
                 { "fetchFundingRateHistory", false },
                 { "fetchFundingRates", false },
@@ -65,6 +68,7 @@ public partial class indodax : Exchange
                 { "fetchIsolatedBorrowRate", false },
                 { "fetchIsolatedBorrowRates", false },
                 { "fetchIsolatedPositions", false },
+                { "fetchLedger", false },
                 { "fetchLeverage", false },
                 { "fetchLeverages", false },
                 { "fetchLeverageTiers", false },
@@ -108,7 +112,8 @@ public partial class indodax : Exchange
                 { "fetchTime", true },
                 { "fetchTrades", true },
                 { "fetchTradingFee", false },
-                { "fetchTradingFees", false },
+                { "fetchTradingFees", true },
+                { "fetchTradingLimits", true },
                 { "fetchTransactionFee", true },
                 { "fetchTransactionFees", false },
                 { "fetchTransactions", "emulated" },
@@ -474,6 +479,67 @@ public partial class indodax : Exchange
     }
 
     /**
+     * @ignore
+     * @method
+     * @name indodax#pairPriceStep
+     * @description tick size for a public pair
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {object} market raw pair from GET /api/pairs
+     * @param {string} [increment] price step from GET /api/price_increments
+     * @returns {string} tick size
+     */
+    public virtual object pairPriceStep(object market, object increment = null)
+    {
+        if (((increment != null)) && (!isEqual(increment, "")))
+        {
+            return increment;
+        }
+        string? pricescale = this.safeString(market, "pricescale");
+        if ((pricescale != null))
+        {
+            return pricescale;
+        }
+        string? pricePrecision = this.safeString(market, "price_precision");
+        if ((pricePrecision != null))
+        {
+            return pricePrecision;
+        }
+        return this.parsePrecision(this.safeString(market, "price_round"));
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#parsePublicTradingFee
+     * @description parse the public pair fee, which is not an account fee tier
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @param {object} market raw pair from GET /api/pairs
+     * @returns {object} a trading fee structure, or undefined when the pair has no fee fields
+     */
+    public virtual object parsePublicTradingFee(object market)
+    {
+        string? takerPercent = this.safeString2(market, "trade_fee_percent_taker", "trade_fee_percent");
+        string? makerPercent = this.safeString2(market, "trade_fee_percent_maker", "trade_fee_percent");
+        if (((takerPercent == null)) && ((makerPercent == null)))
+        {
+            return null;
+        }
+        string? baseId = this.safeString(market, "traded_currency");
+        string? quoteId = this.safeString(market, "base_currency");
+        object bs = this.safeCurrencyCode(baseId);
+        string? quote = this.safeCurrencyCode(quoteId);
+        return new Dictionary<string, object>() {
+            { "info", market },
+            { "symbol", add(add(bs, "/"), quote) },
+            { "percentage", true },
+            { "tierBased", false },
+            { "maker", this.parseNumber(Precise.stringDiv(makerPercent, "100")) },
+            { "taker", this.parseNumber(Precise.stringDiv(takerPercent, "100")) },
+        };
+    }
+
+    /**
      * @method
      * @name indodax#fetchMarkets
      * @description retrieves data on all markets for indodax
@@ -499,12 +565,15 @@ public partial class indodax : Exchange
         //             "price_precision": 1000,
         //             "price_round": 8,
         //             "pricescale": 1000,
+        //             "quantity_increment": "0.00000001",
         //             "trade_min_base_currency": 10000,
         //             "trade_min_traded_currency": 0.00007457,
         //             "has_memo": false,
         //             "memo_name": false,
         //             "has_payment_id": false,
         //             "trade_fee_percent": 0.3,
+        //             "trade_fee_percent_maker": 0.1,
+        //             "trade_fee_percent_taker": 0.2,
         //             "url_logo": "https://indodax.com/v2/logo/svg/color/btc.svg",
         //             "url_logo_png": "https://indodax.com/v2/logo/png/color/btc.png",
         //             "is_maintenance": 0
@@ -523,6 +592,20 @@ public partial class indodax : Exchange
             string? quote = this.safeCurrencyCode(quoteId);
             Int64? isMaintenance = this.safeInteger(market, "is_maintenance");
             bool inMaintenance = (!isEqual(isMaintenance, null)) && ((isMaintenance != 0));
+            bool active = true;
+            if (inMaintenance)
+            {
+                active = false;
+            }
+            object fee = this.parsePublicTradingFee(market);
+            object taker = null;
+            object maker = null;
+            if ((fee != null))
+            {
+                taker = getValue(fee, "taker");
+                maker = getValue(fee, "maker");
+            }
+            string? amountStep = this.safeString(market, "quantity_increment", "0.00000001");
             ((IList<object>)result).Add(new Dictionary<string, object>() {
                 { "id", id },
                 { "symbol", add(add(bs, "/"), quote) },
@@ -538,20 +621,22 @@ public partial class indodax : Exchange
                 { "swap", false },
                 { "future", false },
                 { "option", false },
-                { "active", inMaintenance ? false : true },
+                { "active", active },
                 { "contract", false },
                 { "linear", null },
                 { "inverse", null },
-                { "taker", this.safeNumber(market, "trade_fee_percent") },
+                { "taker", taker },
+                { "maker", maker },
                 { "contractSize", null },
                 { "expiry", null },
                 { "expiryDatetime", null },
                 { "strike", null },
                 { "optionType", null },
                 { "percentage", true },
+                { "tierBased", false },
                 { "precision", new Dictionary<string, object>() {
-                    { "amount", this.parseNumber("1e-8") },
-                    { "price", this.parseNumber(this.parsePrecision(this.safeString(market, "price_round"))) },
+                    { "amount", this.parseNumber(amountStep) },
+                    { "price", this.parseNumber(this.pairPriceStep(market)) },
                     { "cost", this.parseNumber(this.parsePrecision(this.safeString(market, "volume_precision"))) },
                 } },
                 { "limits", new Dictionary<string, object>() {
@@ -564,11 +649,11 @@ public partial class indodax : Exchange
                         { "max", null },
                     } },
                     { "price", new Dictionary<string, object>() {
-                        { "min", this.safeNumber(market, "trade_min_base_currency") },
+                        { "min", null },
                         { "max", null },
                     } },
                     { "cost", new Dictionary<string, object>() {
-                        { "min", null },
+                        { "min", this.safeNumber(market, "trade_min_base_currency") },
                         { "max", null },
                     } },
                 } },
@@ -577,6 +662,135 @@ public partial class indodax : Exchange
             });
         }
         return ccxt.BaseExchange.ToMarketInterfaceList(result);
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchTradingFees
+     * @description fetch the public trading fees for multiple markets
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a dictionary of [fee structures]{@link https://docs.ccxt.com/?id=trading-fee-structure} indexed by market symbols
+     */
+    public async override Task<ccxt.TradingFees> FetchTradingFees(object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        List<object> response = await this.publicGetApiPairs(parameters);
+        IList<object> rawMarkets = this.toArray(response);
+        Dictionary<string, object> result = new Dictionary<string, object>() {};
+        for (int i = 0; i < (rawMarkets?.Count ?? 0); i++)
+        {
+            object fee = this.parsePublicTradingFee(rawMarkets[i]);
+            if ((fee != null))
+            {
+                string? symbol = this.safeString(fee, "symbol");
+                if ((symbol != null))
+                {
+                    ((IDictionary<string,object>)result)[(string)symbol] = fee;
+                }
+            }
+        }
+        return ccxt.BaseExchange.ToTradingFees(result);
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchTradingLimits
+     * @description fetch the public trading limits and price steps for markets
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {string[]|undefined} symbols unified market symbols
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a dictionary of [trading limits structures]{@link https://docs.ccxt.com/?id=trading-limits-structure} indexed by market symbol
+     */
+    public async override Task<Dictionary<string, object>> FetchTradingLimits(object symbols = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        List<object> response = await this.publicGetApiPairs(parameters);
+        Dictionary<string, object> incrementsResponse = await this.publicGetApiPriceIncrements(parameters);
+        IDictionary<string, object> increments = this.safeDict(incrementsResponse, "increments", new Dictionary<string, object>() {});
+        IList<object> rawMarkets = this.toArray(response);
+        Dictionary<string, object> result = new Dictionary<string, object>() {};
+        for (int i = 0; i < (rawMarkets?.Count ?? 0); i++)
+        {
+            object market = rawMarkets[i];
+            string? baseId = this.safeString(market, "traded_currency");
+            string? quoteId = this.safeString(market, "base_currency");
+            object bs = this.safeCurrencyCode(baseId);
+            string? quote = this.safeCurrencyCode(quoteId);
+            object symbol = add(add(bs, "/"), quote);
+            if ((symbols != null))
+            {
+                if (!this.inArray(symbol, symbols))
+                {
+                    continue;
+                }
+            }
+            string? tickerId = this.safeString(market, "ticker_id");
+            string? priceStep = this.safeString(increments, tickerId);
+            if ((priceStep == null))
+            {
+                priceStep = this.safeString(increments, this.safeString(market, "id"));
+            }
+            string? amountStep = this.safeString(market, "quantity_increment");
+            ((IDictionary<string,object>)result)[(string)symbol] = new Dictionary<string, object>() {
+                { "info", market },
+                { "precision", new Dictionary<string, object>() {
+                    { "amount", this.parseNumber(amountStep) },
+                    { "price", this.parseNumber(this.pairPriceStep(market, priceStep)) },
+                } },
+                { "limits", new Dictionary<string, object>() {
+                    { "amount", new Dictionary<string, object>() {
+                        { "min", this.safeNumber(market, "trade_min_traded_currency") },
+                        { "max", null },
+                    } },
+                    { "price", new Dictionary<string, object>() {
+                        { "min", null },
+                        { "max", null },
+                    } },
+                    { "cost", new Dictionary<string, object>() {
+                        { "min", this.safeNumber(market, "trade_min_base_currency") },
+                        { "max", null },
+                    } },
+                } },
+            };
+        }
+        return ccxt.BaseExchange.ToDict(result);
+    }
+
+    /**
+     * @method
+     * @name indodax#fetchFundingLimits
+     * @description fetch the deposit and withdrawal limits for a currency
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md
+     * @param {string[]|undefined} codes unified currency codes
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [funding limits structure]{@link https://docs.ccxt.com/?id=funding-limits-structure}
+     */
+    public async virtual Task<Dictionary<string, object>> FetchFundingLimits(object codes = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        throw new NotSupported ((string)(this.id + " fetchFundingLimits() is not supported yet")) ;
+    }
+
+    /**
+     * @method
+     * @name indodax#editOrder
+     * @description edit a trade order
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
+     * @param {string} id order id
+     * @param {string} symbol unified symbol of the market to edit an order in
+     * @param {string} type 'market' or 'limit'
+     * @param {string} side 'buy' or 'sell'
+     * @param {float} [amount] how much of the currency you want to trade in units of the base currency
+     * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    public async override Task<ccxt.Order> EditOrder(string id, string symbol, string type, string side, double? amount = null, double? price = null, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        throw new NotSupported ((string)(this.id + " editOrder() is not supported yet")) ;
     }
 
     public override object parseBalance(object response)
@@ -1724,6 +1938,34 @@ public partial class indodax : Exchange
 
     /**
      * @method
+     * @name indodax#fetchDepositAddress
+     * @description fetch the deposit address for a currency associated with this account
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+     * @param {string} code unified currency code
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
+     * @returns {object} an [address structure]{@link https://docs.ccxt.com/?id=address-structure}
+     */
+    public async override Task<ccxt.DepositAddress> FetchDepositAddress(string code, object parameters = null)
+    {
+        parameters ??= new Dictionary<string, object>();
+        object addresses = ccxt.BaseExchange.FromDepositAddressList(await this.FetchDepositAddresses(new List<object>() {code}, parameters));
+        IList<object> rows = this.toArray(addresses);
+        for (int i = 0; i < (rows?.Count ?? 0); i++)
+        {
+            object row = rows[i];
+            string? rowCode = this.safeString(row, "currency");
+            if ((rowCode == code))
+            {
+                return ccxt.BaseExchange.ToDepositAddress(row);
+            }
+        }
+        throw new InvalidAddress ((string)(((this.id + " fetchDepositAddress() could not find a deposit address for ") + code) + ", make sure you have created a corresponding deposit address in your wallet on the exchange website")) ;
+    }
+
+    /**
+     * @method
      * @name indodax#fetchDepositAddresses
      * @description fetch deposit addresses for multiple currencies and chain types
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
@@ -1784,9 +2026,7 @@ public partial class indodax : Exchange
         IDictionary<string, object> addresses = this.safeDict(data, "address", new Dictionary<string, object>() {});
         IDictionary<string, object> networks = this.safeDict(data, "network", new Dictionary<string, object>() {});
         List<object> addressKeys = new List<object>(((IDictionary<string,object>)addresses).Keys);
-        Dictionary<string, object> result = new Dictionary<string, object>() {
-            { "info", data },
-        };
+        List<object> result = new List<object>() {};
         for (int i = 0; i < addressKeys.Count; i++)
         {
             string? marketId = ((string)addressKeys[i]);
@@ -1831,13 +2071,13 @@ public partial class indodax : Exchange
                 object finalNetwork = network; // java req
                 if ((code != null))
                 {
-                    ((IDictionary<string,object>)result)[(string)code] = new Dictionary<string, object>() {
+                    ((IList<object>)result).Add(new Dictionary<string, object>() {
                         { "info", new Dictionary<string, object>() {} },
                         { "currency", code },
                         { "network", finalNetwork },
                         { "address", address },
                         { "tag", null },
-                    };
+                    });
                 }
             }
         }
@@ -1867,7 +2107,7 @@ public partial class indodax : Exchange
         {
             ((IDictionary<string,object>)request)["omitZeroBalances"] = omitZeroBalances;
         }
-        object response = await ((Task<object>)callDynamically(this, "v2GetAccount", new object[] { this.extend(request, parameters) }));
+        Dictionary<string, object> response = await this.v2GetAccount(this.extend(request, parameters));
         return this.parseBalanceV2(response);
     }
 
@@ -2066,7 +2306,7 @@ public partial class indodax : Exchange
         object market = getValue(orderRequest, 0);
         object request = getValue(orderRequest, 1);
         parameters = getValue(orderRequest, 2);
-        object response = await ((Task<object>)callDynamically(this, "v2GetOrder", new object[] { this.extend(request, parameters) }));
+        Dictionary<string, object> response = await this.v2GetOrder(this.extend(request, parameters));
         return this.parseOrder(response, market);
     }
 
@@ -2094,7 +2334,7 @@ public partial class indodax : Exchange
             market = this.market(symbol);
             ((IDictionary<string,object>)request)["symbol"] = this.tapiV2Symbol(market);
         }
-        object response = await ((Task<object>)callDynamically(this, "v2GetOpenOrders", new object[] { this.extend(request, parameters) }));
+        List<object> response = await this.v2GetOpenOrders(this.extend(request, parameters));
         IList<object> rows = this.toArray(response);
         return this.parseOrders(rows, market, since, limit);
     }
@@ -2158,13 +2398,13 @@ public partial class indodax : Exchange
             {
                 ((IDictionary<string,object>)request)["limit"] = requestLimit;
             }
-            object response = null;
+            Dictionary<string, object> response = null;
             if (isEqual(historyKind, "orders"))
             {
-                response = await ((Task<object>)callDynamically(this, "v2GetOrderHistories", new object[] { this.extend(request, parameters) }));
+                response = await this.v2GetOrderHistories(this.extend(request, parameters));
             } else
             {
-                response = await ((Task<object>)callDynamically(this, "v2GetMyTrades", new object[] { this.extend(request, parameters) }));
+                response = await this.v2GetMyTrades(this.extend(request, parameters));
             }
             return this.safeList(response, "data", new List<object>() {});
         }
@@ -2193,13 +2433,13 @@ public partial class indodax : Exchange
             {
                 ((IDictionary<string,object>)request)["limit"] = requestLimit;
             }
-            object response = null;
+            Dictionary<string, object> response = null;
             if (isEqual(historyKind, "orders"))
             {
-                response = await ((Task<object>)callDynamically(this, "v2GetOrderHistories", new object[] { this.extend(request, parameters) }));
+                response = await this.v2GetOrderHistories(this.extend(request, parameters));
             } else
             {
-                response = await ((Task<object>)callDynamically(this, "v2GetMyTrades", new object[] { this.extend(request, parameters) }));
+                response = await this.v2GetMyTrades(this.extend(request, parameters));
             }
             List<object> rows = this.safeList(response, "data", new List<object>() {});
             for (int i = 0; i < rows.Count; i++)
@@ -2356,7 +2596,7 @@ public partial class indodax : Exchange
         {
             ((IDictionary<string,object>)request)["selfTradePreventionMode"] = selfTradePreventionMode;
         }
-        object response = await ((Task<object>)callDynamically(this, "v2PostOrder", new object[] { this.extend(request, parameters) }));
+        Dictionary<string, object> response = await this.v2PostOrder(this.extend(request, parameters));
         return this.parseOrder(response, market);
     }
 
@@ -2380,7 +2620,7 @@ public partial class indodax : Exchange
         object market = getValue(orderRequest, 0);
         object request = getValue(orderRequest, 1);
         parameters = getValue(orderRequest, 2);
-        object response = await ((Task<object>)callDynamically(this, "v2DeleteOrder", new object[] { this.extend(request, parameters) }));
+        Dictionary<string, object> response = await this.v2DeleteOrder(this.extend(request, parameters));
         return this.parseOrder(response, market);
     }
 
@@ -2425,7 +2665,7 @@ public partial class indodax : Exchange
      * @name indodax#depositAddressesV2
      * @param {string[]} [codes] unified currency codes
      * @param {object} [params] extra parameters
-     * @returns {object} a dictionary of address structures
+     * @returns {object[]} a list of address structures
      */
     public async virtual Task<object> depositAddressesV2(object codes = null, object parameters = null)
     {
@@ -2439,9 +2679,7 @@ public partial class indodax : Exchange
         networkCode = (string)((IList<object>)networkCodeparametersVariable)[0];
         parameters = ((IList<object>)networkCodeparametersVariable)[1];
         object currencyCodes = this.v2CurrencyCodes(codes);
-        Dictionary<string, object> result = new Dictionary<string, object>() {
-            { "info", new List<object>() {} },
-        };
+        List<object> result = new List<object>() {};
         for (int i = 0; i < getArrayLength(currencyCodes); i++)
         {
             object code = getValue(currencyCodes, i);
@@ -2453,14 +2691,8 @@ public partial class indodax : Exchange
             {
                 ((IDictionary<string,object>)request)["network"] = this.networkCodeToId(networkCode, code);
             }
-            object response = await ((Task<object>)callDynamically(this, "v2GetCapitalDepositAddressList", new object[] { this.extend(request, parameters) }));
+            List<object> response = await this.v2GetCapitalDepositAddressList(this.extend(request, parameters));
             IList<object> rows = this.toArray(response);
-            List<object> info = this.safeList(result, "info", new List<object>() {});
-            for (int j = 0; j < (rows?.Count ?? 0); j++)
-            {
-                ((IList<object>)info).Add(rows[j]);
-            }
-            ((IDictionary<string,object>)result)["info"] = info;
             if ((rows?.Count ?? 0) < 1)
             {
                 continue;
@@ -2472,13 +2704,17 @@ public partial class indodax : Exchange
                 this.checkAddress(address);
             }
             string? networkId = this.safeString(row, "network");
-            ((IDictionary<string,object>)result)[(string)(currency.ContainsKey("code") ? currency["code"] : null)] = new Dictionary<string, object>() {
-                { "info", row },
-                { "currency", (currency.ContainsKey("code") ? currency["code"] : null) },
-                { "network", this.networkIdToCode(networkId, (currency.ContainsKey("code") ? currency["code"] : null)) },
-                { "address", address },
-                { "tag", this.safeString(row, "tag") },
-            };
+            string? currencyCode = this.safeString(currency, "code");
+            if ((currencyCode != null))
+            {
+                ((IList<object>)result).Add(new Dictionary<string, object>() {
+                    { "info", row },
+                    { "currency", currencyCode },
+                    { "network", this.networkIdToCode(networkId, currencyCode) },
+                    { "address", address },
+                    { "tag", this.safeString(row, "tag") },
+                });
+            }
         }
         return result;
     }
@@ -2568,13 +2804,13 @@ public partial class indodax : Exchange
             {
                 ((IDictionary<string,object>)request)["limit"] = requestLimit;
             }
-            object response = null;
+            List<object> response = null;
             if (isEqual(direction, "deposit"))
             {
-                response = await ((Task<object>)callDynamically(this, "v2GetCapitalDepositHisrec", new object[] { this.extend(request, parameters) }));
+                response = await this.v2GetCapitalDepositHisrec(this.extend(request, parameters));
             } else
             {
-                response = await ((Task<object>)callDynamically(this, "v2GetCapitalWithdrawHistory", new object[] { this.extend(request, parameters) }));
+                response = await this.v2GetCapitalWithdrawHistory(this.extend(request, parameters));
             }
             IList<object> rows = this.toArray(response);
             for (int j = 0; j < (rows?.Count ?? 0); j++)
@@ -2631,7 +2867,7 @@ public partial class indodax : Exchange
             {
                 ((IDictionary<string,object>)request)["limit"] = requestLimit;
             }
-            object response = await ((Task<object>)callDynamically(this, "v2GetFiatOrders", new object[] { this.extend(request, parameters) }));
+            Dictionary<string, object> response = await this.v2GetFiatOrders(this.extend(request, parameters));
             List<object> rows = this.safeList(response, "data", new List<object>() {});
             for (int j = 0; j < rows.Count; j++)
             {
@@ -2828,7 +3064,7 @@ public partial class indodax : Exchange
                 { "accountInfo", this.json(accountInfo) },
                 { "clientRequestId", clientRequestId },
             };
-            object fiatResponse = await ((Task<object>)callDynamically(this, "v2PostFiatWithdraw", new object[] { this.extend(fiatRequest, parameters) }));
+            Dictionary<string, object> fiatResponse = await this.v2PostFiatWithdraw(this.extend(fiatRequest, parameters));
             IDictionary<string, object> data = this.safeDict(fiatResponse, "data", new Dictionary<string, object>() {});
             string? orderId = this.safeString(data, "orderId");
             return this.parseV2Transaction(new Dictionary<string, object>() {
@@ -2856,7 +3092,7 @@ public partial class indodax : Exchange
         {
             ((IDictionary<string,object>)request)["network"] = this.networkCodeToId(networkCode, (currency.ContainsKey("code") ? currency["code"] : null));
         }
-        object response = await ((Task<object>)callDynamically(this, "v2PostCapitalWithdrawApply", new object[] { this.extend(request, parameters) }));
+        Dictionary<string, object> response = await this.v2PostCapitalWithdrawApply(this.extend(request, parameters));
         ((IDictionary<string,object>)response)["txType"] = "withdraw";
         return this.parseV2Transaction(response, currency);
     }

@@ -302,7 +302,7 @@ func (this *ExchangeTyped) FetchTime(params ...any) (int64, error) {
 	if IsError(res) {
 		return -1, CreateReturnError(res)
 	}
-	return (res).(int64), nil
+	return SafeInt(res), nil
 }
 func (this *ExchangeTyped) FetchTradingLimits(options ...FetchTradingLimitsOptions) (map[string]any, error) {
 
@@ -3424,7 +3424,7 @@ func (this *BaseExchangeTyped) FetchTime(params ...any) (int64, error) {
 	if IsError(res) {
 		return -1, CreateReturnError(res)
 	}
-	return (res).(int64), nil
+	return SafeInt(res), nil
 }
 func (this *BaseExchangeTyped) FetchTradingLimits(options ...FetchTradingLimitsOptions) (map[string]any, error) {
 

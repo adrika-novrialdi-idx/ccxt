@@ -1,5 +1,5 @@
 import Exchange from './abstract/indodax.js';
-import type { Balances, Currency, Dict, Int, Market, Num, OHLCV, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade, Transaction, int, DepositAddress, NullableDict, DepositWithdrawFee } from './base/types.js';
+import type { Balances, Currency, Dict, Int, Market, Num, OHLCV, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade, TradingFees, Transaction, int, DepositAddress, NullableDict, DepositWithdrawFee } from './base/types.js';
 /**
  * @class indodax
  * @augments Exchange
@@ -34,6 +34,35 @@ export default class indodax extends Exchange {
      */
     fetchTime(params?: Dict): Promise<Int>;
     /**
+     * @ignore
+     * @method
+     * @name indodax#pairPriceStep
+     * @description tick size for a public pair
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {object} market raw pair from GET /api/pairs
+     * @param {string} [increment] price step from GET /api/price_increments
+     * @returns {string} tick size
+     */
+    pairPriceStep(market: Dict, increment?: Str): Str;
+    /**
+     * @ignore
+     * @method
+     * @name indodax#parsePublicTradingFee
+     * @description parse the public pair fee, which is not an account fee tier
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @param {object} market raw pair from GET /api/pairs
+     * @returns {object} a trading fee structure, or undefined when the pair has no fee fields
+     */
+    parsePublicTradingFee(market: Dict): {
+        info: Dict;
+        symbol: string;
+        percentage: boolean;
+        tierBased: boolean;
+        maker: number;
+        taker: number;
+    } | undefined;
+    /**
      * @method
      * @name indodax#fetchMarkets
      * @description retrieves data on all markets for indodax
@@ -42,6 +71,51 @@ export default class indodax extends Exchange {
      * @returns {object[]} an array of objects representing market data
      */
     fetchMarkets(params?: Dict): Promise<Market[]>;
+    /**
+     * @method
+     * @name indodax#fetchTradingFees
+     * @description fetch the public trading fees for multiple markets
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a dictionary of [fee structures]{@link https://docs.ccxt.com/?id=trading-fee-structure} indexed by market symbols
+     */
+    fetchTradingFees(params?: Dict): Promise<TradingFees>;
+    /**
+     * @method
+     * @name indodax#fetchTradingLimits
+     * @description fetch the public trading limits and price steps for markets
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+     * @param {string[]|undefined} symbols unified market symbols
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a dictionary of [trading limits structures]{@link https://docs.ccxt.com/?id=trading-limits-structure} indexed by market symbol
+     */
+    fetchTradingLimits(symbols?: Strings, params?: Dict): Promise<Dict>;
+    /**
+     * @method
+     * @name indodax#fetchFundingLimits
+     * @description fetch the deposit and withdrawal limits for a currency
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md
+     * @param {string[]|undefined} codes unified currency codes
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} a [funding limits structure]{@link https://docs.ccxt.com/?id=funding-limits-structure}
+     */
+    fetchFundingLimits(codes?: Strings, params?: Dict): Promise<Dict>;
+    /**
+     * @method
+     * @name indodax#editOrder
+     * @description edit a trade order
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
+     * @param {string} id order id
+     * @param {string} symbol unified symbol of the market to edit an order in
+     * @param {string} type 'market' or 'limit'
+     * @param {string} side 'buy' or 'sell'
+     * @param {float} [amount] how much of the currency you want to trade in units of the base currency
+     * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+     */
+    editOrder(id: string, symbol: string, type: OrderType, side: OrderSide, amount?: Num, price?: Num, params?: Dict): Promise<Order>;
     parseBalance(response: any): Balances;
     /**
      * @method
@@ -246,6 +320,18 @@ export default class indodax extends Exchange {
     parseTransactionStatus(status: Str): Str;
     /**
      * @method
+     * @name indodax#fetchDepositAddress
+     * @description fetch the deposit address for a currency associated with this account
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+     * @param {string} code unified currency code
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
+     * @returns {object} an [address structure]{@link https://docs.ccxt.com/?id=address-structure}
+     */
+    fetchDepositAddress(code: string, params?: Dict): Promise<DepositAddress>;
+    /**
+     * @method
      * @name indodax#fetchDepositAddresses
      * @description fetch deposit addresses for multiple currencies and chain types
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
@@ -407,7 +493,7 @@ export default class indodax extends Exchange {
      * @name indodax#depositAddressesV2
      * @param {string[]} [codes] unified currency codes
      * @param {object} [params] extra parameters
-     * @returns {object} a dictionary of address structures
+     * @returns {object[]} a list of address structures
      */
     depositAddressesV2(codes?: Strings, params?: Dict): Promise<DepositAddress[]>;
     /**
