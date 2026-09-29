@@ -2402,15 +2402,20 @@ export default class indodax extends Exchange {
         for (let i = 0; i < currencyCodes.length; i++) {
             const code = currencyCodes[i];
             const currency = this.currency (code);
+            const coinId = this.safeString (currency, 'id', code);
+            if ((coinId === undefined) || (coinId === '')) {
+                continue;
+            }
             const request: Dict = {
-                'coin': currency['id'],
+                'coin': coinId,
             };
             if (networkCode !== undefined) {
                 request['network'] = this.networkCodeToId (networkCode, code);
             }
             const response = await this.v2GetCapitalDepositAddressList (this.extend (request, params));
             const rows = this.toArray (response);
-            if (rows.length < 1) {
+            const numRows = rows.length;
+            if (numRows < 1) {
                 continue;
             }
             const row = rows[0];
