@@ -2367,15 +2367,20 @@ class indodax extends Exchange {
         for ($i = 0; $i < count($currencyCodes); $i++) {
             $code = $currencyCodes[$i];
             $currency = $this->currency($code);
+            $coinId = $this->safe_string($currency, 'id', $code);
+            if (($coinId === null) || ($coinId === '')) {
+                continue;
+            }
             $request = array(
-                'coin' => $currency['id'],
+                'coin' => $coinId,
             );
             if ($networkCode !== null) {
                 $request['network'] = $this->network_code_to_id($networkCode, $code);
             }
             $response = $this->v2GetCapitalDepositAddressList($this->extend($request, $params));
             $rows = $this->to_array($response);
-            if (strlen($rows) < 1) {
+            $numRows = count($rows);
+            if ($numRows < 1) {
                 continue;
             }
             $row = $rows[0];

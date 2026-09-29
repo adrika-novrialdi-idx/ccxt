@@ -3204,9 +3204,13 @@ impl IndodaxCore {
             while { if !__for_first_226 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_226 = false; i.as_f64().unwrap_or(f64::NAN) < ((currencyCodes.len() as i64) as f64) } {
             let mut code: Value = currencyCodes.as_array().and_then(|__arr| match &i { Value::Int(__n) => __arr.get(*__n as usize), Value::Str(__s) => __s.parse::<usize>().ok().and_then(|__n| __arr.get(__n)), _ => None }).cloned().unwrap_or(Value::Null);
             let mut currency: Value = self.currency(code.clone());
+            let mut coinId: Value = self.safe_string_k(currency.clone(), "id", &[code.clone()]);
+            if (coinId == Value::Null) || (coinId.as_str() == Some("")) {
+                continue;
+            }
             let mut request: Value = Value::Map({
                 let mut m = indexmap::IndexMap::new();
-                    m.insert("coin".to_string(), currency.as_map().and_then(|__m| __m.get("id")).cloned().unwrap_or(Value::Null));
+                    m.insert("coin".to_string(), coinId);
                 m
             });
             if (networkCode != Value::Null) {
@@ -3215,7 +3219,8 @@ impl IndodaxCore {
             let __ws_arg_23 = self.extend(request, &[params.clone()]);
             let mut response: Value = self.v2_get_capital_deposit_address_list(&[__ws_arg_23]).await;
             let mut rows: Value = self.to_array(response);
-            if ((rows.len() as i64) as f64) < ((1i64) as f64) {
+            let mut numRows: f64 = ((rows.len() as i64) as f64);
+            if numRows < ((1i64) as f64) {
                 continue;
             }
             let mut row: Value = rows.as_array().and_then(|__arr| __arr.get(0)).cloned().unwrap_or(Value::Null);

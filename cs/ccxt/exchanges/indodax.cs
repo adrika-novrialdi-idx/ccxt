@@ -2684,8 +2684,13 @@ public partial class indodax : Exchange
         {
             object code = getValue(currencyCodes, i);
             Dictionary<string, object> currency = this.currency(((string)code));
+            string? coinId = this.safeString(currency, "id", code);
+            if (((coinId == null)) || ((coinId == "")))
+            {
+                continue;
+            }
             Dictionary<string, object> request = new Dictionary<string, object>() {
-                { "coin", (currency.ContainsKey("id") ? currency["id"] : null) },
+                { "coin", coinId },
             };
             if ((networkCode != null))
             {
@@ -2693,7 +2698,8 @@ public partial class indodax : Exchange
             }
             List<object> response = await this.v2GetCapitalDepositAddressList(this.extend(request, parameters));
             IList<object> rows = this.toArray(response);
-            if ((rows?.Count ?? 0) < 1)
+            int numRows = (rows?.Count ?? 0);
+            if (numRows < 1)
             {
                 continue;
             }

@@ -2198,14 +2198,18 @@ class indodax(Exchange, ImplicitAPI):
         for i in range(0, len(currencyCodes)):
             code = currencyCodes[i]
             currency = self.currency(code)
+            coinId = self.safe_string(currency, 'id', code)
+            if (coinId is None) or (coinId == ''):
+                continue
             request = {
-                'coin': currency['id'],
+                'coin': coinId,
             }
             if networkCode is not None:
                 request['network'] = self.network_code_to_id(networkCode, code)
             response = await self.v2GetCapitalDepositAddressList(self.extend(request, params))
             rows = self.to_array(response)
-            if len(rows) < 1:
+            numRows = len(rows)
+            if numRows < 1:
                 continue
             row = rows[0]
             address = self.safe_string(row, 'address')

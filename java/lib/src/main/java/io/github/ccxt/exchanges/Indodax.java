@@ -2967,8 +2967,14 @@ public class Indodax extends IndodaxApi
             {
                 Object code = (currencyCodes == null || i < 0 || i >= ((List<?>)currencyCodes).size() ? null : ((List<?>)currencyCodes).get(i));
                 Map<String, Object> currency = (Map<String, Object>) this.currency((String) (code));
+                String coinId = this.safeString(currency, "id", code);
+                if ((java.util.Objects.equals(coinId, null)) || (java.util.Objects.equals(coinId, "")))
+                {
+                    continue;
+                }
+                final Object finalCoinId = coinId;
                 Map<String, Object> request = new HashMap<String, Object>() {{
-                    put( "coin", ((Map<String, Object>)currency).get("id") );
+                    put( "coin", finalCoinId );
                 }};
                 if (!java.util.Objects.equals(networkCode, null))
                 {
@@ -2976,7 +2982,8 @@ public class Indodax extends IndodaxApi
                 }
                 List<Object> response = (this.v2GetCapitalDepositAddressList(this.extend(request, parameters))).join();
                 List<Object> rows = this.toArray(response);
-                if (((List<?>)rows).size() < 1)
+                Object numRows = ((List<?>)rows).size();
+                if (Helpers.isLessThan(numRows, 1))
                 {
                     continue;
                 }

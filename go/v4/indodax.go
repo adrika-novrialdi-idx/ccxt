@@ -3115,8 +3115,12 @@ func (this *Indodax) depositAddressesV2Body(ch chan any, optionalArgs ...any) an
 	for i := 0; i < GetArrayLength(currencyCodes); i++ {
 		var code any = GetValue(currencyCodes, i)
 		var currency map[string]any = MapTyped(this.Currency(code))
+		var coinId *string = this.SafeString(currency, "id", code)
+		if (coinId == nil) || (coinId != nil && *coinId == "") {
+			continue
+		}
 		var request map[string]any = map[string]any{
-			"coin": currency["id"],
+			"coin": coinId,
 		}
 		if networkCode != nil {
 			request["network"] = this.NetworkCodeToId(networkCode, code)
@@ -3125,7 +3129,8 @@ func (this *Indodax) depositAddressesV2Body(ch chan any, optionalArgs ...any) an
 		response := (<-this.V2GetCapitalDepositAddressList(this.Extend(request, params)))
 		PanicOnError(response)
 		var rows []any = this.ToArray(response)
-		if len(rows) < 1 {
+		var numRows int = len(rows)
+		if numRows < 1 {
 			continue
 		}
 		var row any = func() any {
@@ -3389,8 +3394,8 @@ func (this *Indodax) fetchDepositsBody(ch chan any, optionalArgs ...any) any {
 	}
 	if this.Markets == nil {
 
-		retRes258812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes258812)
+		retRes259312 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes259312)
 	}
 	var until *int64 = this.SafeInteger(params, "until")
 	params = this.Omit(params, []any{"until"})
@@ -3452,8 +3457,8 @@ func (this *Indodax) fetchWithdrawalsBody(ch chan any, optionalArgs ...any) any 
 	}
 	if this.Markets == nil {
 
-		retRes262312 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes262312)
+		retRes262812 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes262812)
 	}
 	var until *int64 = this.SafeInteger(params, "until")
 	params = this.Omit(params, []any{"until"})
@@ -3579,8 +3584,8 @@ func (this *Indodax) sendWithdrawV2Body(ch chan any, code any, amount any, addre
 	params = GetValue(tagparamsVariable, 1)
 	if this.Markets == nil {
 
-		retRes271212 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes271212)
+		retRes271712 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes271712)
 	}
 	var currency map[string]any = MapTyped(this.Currency(code))
 	if GetValue(currency, "code") == "IDR" {
