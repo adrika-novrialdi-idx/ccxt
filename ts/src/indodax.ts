@@ -229,6 +229,7 @@ export default class indodax extends Exchange {
                     '-1121': BadSymbol,
                     '-2013': OrderNotFound,
                     '-1021': InvalidNonce,
+                    'invalid_timestamp': InvalidNonce,
                     '-1022': AuthenticationError,
                     '-1002': AuthenticationError,
                     '-2014': AuthenticationError,
@@ -375,6 +376,18 @@ export default class indodax extends Exchange {
 
     override nonce (): number {
         return this.milliseconds () - this.options['timeDifference'];
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#requestTimestamp
+     * @description millisecond timestamp for a signed request, as an integer string
+     * @returns {string} timestamp in milliseconds
+     */
+    requestTimestamp (): string {
+        const timeDifference = this.safeInteger (this.options, 'timeDifference', 0);
+        return this.numberToString (this.milliseconds () - timeDifference);
     }
 
     /**
@@ -2894,7 +2907,7 @@ export default class indodax extends Exchange {
             this.checkRequiredCredentials ();
             url = url + '/api/v2/' + this.implodeParams (path, params);
             const query = this.urlencode (this.extend ({
-                'timestamp': this.nonce (),
+                'timestamp': this.requestTimestamp (),
                 'recvWindow': this.safeInteger (this.options, 'recvWindow', 5000),
             }, params));
             const signature = this.hmac (this.encode (query), this.encode (this.secret), sha256);
@@ -2912,8 +2925,8 @@ export default class indodax extends Exchange {
             this.checkRequiredCredentials ();
             body = this.urlencode (this.extend ({
                 'method': path,
-                'timestamp': this.nonce (),
-                'recvWindow': this.options['recvWindow'],
+                'timestamp': this.requestTimestamp (),
+                'recvWindow': this.safeInteger (this.options, 'recvWindow', 5000),
             }, params));
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -2922,6 +2935,34 @@ export default class indodax extends Exchange {
             };
         }
         return { 'url': url, 'method': method, 'body': body, 'headers': headers };
+    }
+
+    /**
+     * @ignore
+     * @method
+     * @name indodax#request
+     * @description send a request and retry once when the exchange rejects the timestamp
+     * @param {string} path endpoint path
+     * @param {string} [api] api section, public, private, or v2
+     * @param {string} [method] http method
+     * @param {object} [params] request parameters
+     * @param {object} [headers] request headers
+     * @param {string} [body] request body
+     * @param {object} [config] request config
+     * @returns {object} the exchange response
+     */
+    override async request (path: any, api = 'public', method = 'GET', params: Dict = {}, headers: any = undefined, body: any = undefined, config: any = {}): Promise<any> {
+        try {
+            return await this.fetch2 (path, api, method, params, headers, body, config);
+        } catch (e) {
+            const adjusted = this.safeBool (this.options, 'timestampAdjusted', false);
+            if ((api === 'public') || adjusted || !(e instanceof InvalidNonce)) {
+                throw e;
+            }
+            this.options['timestampAdjusted'] = true;
+            await this.loadTimeDifference ();
+            return await this.fetch2 (path, api, method, params, headers, body, config);
+        }
     }
 
     override handleErrors (code: int, reason: string, url: string, method: string, headers: Dict, body: string, response: any, requestHeaders: any, requestBody: any) {
@@ -2972,6 +3013,10 @@ export default class indodax extends Exchange {
             }
         }
         const feedback = this.id + ' ' + body;
+        const errorCodeText = this.safeString (response, 'error_code');
+        if (errorCodeText !== undefined) {
+            this.throwExactlyMatchedException (this.exceptions['exact'], errorCodeText, feedback);
+        }
         this.throwExactlyMatchedException (this.exceptions['exact'], error, feedback);
         this.throwBroadlyMatchedException (this.exceptions['broad'], error, feedback);
         throw new ExchangeError (feedback); // unknown message
