@@ -122,6 +122,15 @@
         ],
         "fetchOpenOrders": [
             {
+                "description": "TAPI v1 open orders send ticker_id",
+                "method": "fetchOpenOrders",
+                "url": "https://indodax.com/tapi",
+                "input": [
+                    "BTC/IDR"
+                ],
+                "output": "method=openOrders&timestamp=1&recvWindow=5000&pair=btc_idr"
+            },
+            {
                 "description": "TAPI v2 open orders for one symbol",
                 "method": "fetchOpenOrders",
                 "url": "https://api.indodax.com/api/v2/openOrders?timestamp=1700000000000&recvWindow=5000&symbol=btcidr",
