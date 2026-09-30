@@ -3709,7 +3709,6 @@ public class Indodax extends IndodaxApi
                 (this.loadTimeDifference()).join();
                 return (this.fetch2(path, api, method, parameters, headers, body, config)).join();
             }
-            return null;
         });
 
     }
