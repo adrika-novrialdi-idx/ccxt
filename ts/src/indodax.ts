@@ -272,6 +272,7 @@ export default class indodax extends Exchange {
             // exchange-specific options
             'options': {
                 'tapiVersion': '1', // '2' opts private calls into TAPI v2; a v1 key cannot call v2
+                'sandboxUrl': undefined, // optional v2 base host with no trailing path; unset keeps urls.api.v2
                 'recvWindow': 5 * 1000, // default 5 sec
                 'timeDifference': 0, // the difference between system clock and exchange clock
                 'adjustForTimeDifference': false, // controls the adjustment logic upon instantiation
@@ -2922,6 +2923,10 @@ export default class indodax extends Exchange {
             }
         } else if (api === 'v2') {
             this.checkRequiredCredentials ();
+            const sandboxUrl = this.safeString (this.options, 'sandboxUrl');
+            if ((sandboxUrl !== undefined) && (sandboxUrl !== '')) {
+                url = sandboxUrl;
+            }
             url = url + '/api/v2/' + this.implodeParams (path, params);
             const query = this.urlencode (this.extend ({
                 'timestamp': this.requestTimestamp (),
