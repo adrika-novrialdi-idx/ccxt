@@ -166,6 +166,22 @@
                 "options": {
                     "tapiVersion": "2"
                 }
+            },
+            {
+                "description": "TAPI v2 my trades since returns only the first 7-day window",
+                "method": "fetchMyTrades",
+                "url": "https://api.indodax.com/api/v2/myTrades?timestamp=1700000000000&recvWindow=5000&symbol=btcidr&startTime=1700000000000&endTime=1700604800000",
+                "input": [
+                    "BTC/IDR",
+                    1700000000000,
+                    null,
+                    {
+                        "until": 1702592000000
+                    }
+                ],
+                "options": {
+                    "tapiVersion": "2"
+                }
             }
         ],
         "fetchDepositAddresses": [
@@ -197,6 +213,22 @@
                 "url": "https://api.indodax.com/api/v2/capital/deposit/hisrec?timestamp=1700000000000&recvWindow=5000&coin=btc",
                 "input": [
                     "BTC"
+                ],
+                "options": {
+                    "tapiVersion": "2"
+                }
+            },
+            {
+                "description": "TAPI v2 IDR deposits since returns only the first 30-day window",
+                "method": "fetchDeposits",
+                "url": "https://api.indodax.com/api/v2/fiat/orders?timestamp=1700000000000&recvWindow=5000&transactionType=0&beginTime=1700000000000&endTime=1702592000000",
+                "input": [
+                    "IDR",
+                    1700000000000,
+                    null,
+                    {
+                        "until": 1703888000000
+                    }
                 ],
                 "options": {
                     "tapiVersion": "2"
