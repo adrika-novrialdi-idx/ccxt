@@ -1826,7 +1826,7 @@ export default class indodax extends Exchange {
      * @param {object} networks network map from getInfo
      * @param {string} currencyId currency id key
      * @param {string} code unified currency code
-     * @returns {string|string[]|undefined} unified network code or a list of them
+     * @returns {string[]} unified network codes, one per network
      */
     v1DepositNetwork(networks, currencyId, code) {
         const networkList = this.safeList(networks, currencyId);
@@ -1859,13 +1859,6 @@ export default class indodax extends Exchange {
             if (networkCode !== undefined) {
                 parsed.push(networkCode.toUpperCase());
             }
-        }
-        const parsedCount = parsed.length;
-        if (parsedCount < 1) {
-            return undefined;
-        }
-        if (parsedCount === 1) {
-            return parsed[0];
         }
         return parsed;
     }
@@ -1957,16 +1950,30 @@ export default class indodax extends Exchange {
             const address = this.safeString(addresses, marketId);
             if ((address !== undefined) && ((codes === undefined) || (this.inArray(code, codes)))) {
                 this.checkAddress(address);
-                const network = this.v1DepositNetwork(networks, marketId, code);
-                const finalNetwork = network; // java req
+                const networkCodes = this.v1DepositNetwork(networks, marketId, code);
+                const networkCount = networkCodes.length;
                 if (code !== undefined) {
-                    result.push({
-                        'info': {},
-                        'currency': code,
-                        'network': finalNetwork,
-                        'address': address,
-                        'tag': undefined,
-                    });
+                    if (networkCount < 1) {
+                        result.push({
+                            'info': {},
+                            'currency': code,
+                            'network': undefined,
+                            'address': address,
+                            'tag': undefined,
+                        });
+                    }
+                    else {
+                        for (let n = 0; n < networkCount; n++) {
+                            const networkCode = networkCodes[n];
+                            result.push({
+                                'info': {},
+                                'currency': code,
+                                'network': networkCode,
+                                'address': address,
+                                'tag': undefined,
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -2165,15 +2172,16 @@ export default class indodax extends Exchange {
         const numParts = parts.length;
         const tail = parts[numParts - 1];
         const digits = '0123456789';
-        const tailLength = tail.length;
-        if (tailLength < 1) {
+        if (tail.length < 1) {
             return orderId;
         }
-        for (let index = 0; index < tailLength; index++) {
+        let index = 0;
+        while (index < tail.length) {
             const character = tail[index];
             if (digits.indexOf(character) < 0) {
                 return orderId;
             }
+            index = this.sum(index, 1);
         }
         return tail;
     }
@@ -2651,7 +2659,7 @@ export default class indodax extends Exchange {
      * @description fetch all deposits made to an account
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
-     * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+     * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
      * @param {int} [since] the earliest time in ms to fetch deposits for
      * @param {int} [limit] the maximum number of deposits structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -2799,15 +2807,14 @@ export default class indodax extends Exchange {
             }
             const clientRequestId = this.safeString(params, 'clientOrderId', this.milliseconds().toString());
             params = this.omit(params, ['bankCode', 'clientOrderId']);
-            const accountInfo = {
-                'accountNumber': address,
-                'bankCodeForPix': bankCode,
-            };
+            const accountNumberJson = this.json(address);
+            const bankCodeJson = this.json(bankCode);
+            const accountInfo = '{"accountNumber":' + accountNumberJson + ',"bankCodeForPix":' + bankCodeJson + '}';
             const fiatRequest = {
                 'apiPaymentMethod': 'bank_transfer',
                 'currency': 'idr',
                 'amount': this.parseToInt(amount),
-                'accountInfo': this.json(accountInfo),
+                'accountInfo': accountInfo,
                 'clientRequestId': clientRequestId,
             };
             const fiatResponse = await this.v2PostFiatWithdraw(this.extend(fiatRequest, params));

@@ -2231,7 +2231,7 @@ public class Indodax extends IndodaxApi
      * @param {object} networks network map from getInfo
      * @param {string} currencyId currency id key
      * @param {string} code unified currency code
-     * @returns {string|string[]|undefined} unified network code or a list of them
+     * @returns {string[]} unified network codes, one per network
      */
     public Object v1DepositNetwork(Map<String, Object> networks, Object currencyId, String code)
     {
@@ -2273,15 +2273,6 @@ public class Indodax extends IndodaxApi
             {
                 ((List<Object>)parsed).add(((String)networkCode).toUpperCase());
             }
-        }
-        Object parsedCount = ((List<?>)parsed).size();
-        if (Helpers.isLessThan(parsedCount, 1))
-        {
-            return null;
-        }
-        if (java.util.Objects.equals(parsedCount, 1))
-        {
-            return (parsed == null || 0 >= ((List<?>)parsed).size() ? null : ((List<?>)parsed).get(0));
         }
         return parsed;
     }
@@ -2394,19 +2385,37 @@ public class Indodax extends IndodaxApi
                 if ((!java.util.Objects.equals(address, null)) && ((java.util.Objects.equals(codes, null)) || Helpers.isTrue((this.inArray(code, codes)))))
                 {
                     this.checkAddress(address);
-                    Object network = this.v1DepositNetwork((Map<String, Object>) (networks), marketId, code);
-                    Object finalNetwork = network; // java req
+                    Object networkCodes = this.v1DepositNetwork((Map<String, Object>) (networks), marketId, code);
+                    Object networkCount = ((List<?>)networkCodes).size();
                     if (!java.util.Objects.equals(code, null))
                     {
+                        if (Helpers.isLessThan(networkCount, 1))
+                        {
     final Object finalCode = code;
-                        final Object finalAddress = address;
-                                            ((List<Object>)result).add(new HashMap<String, Object>() {{
-                            put( "info", new HashMap<String, Object>() {{}} );
-                            put( "currency", finalCode );
-                            put( "network", finalNetwork );
-                            put( "address", finalAddress );
-                            put( "tag", null );
-                        }});
+                            final Object finalAddress = address;
+                                                    ((List<Object>)result).add(new HashMap<String, Object>() {{
+                                put( "info", new HashMap<String, Object>() {{}} );
+                                put( "currency", finalCode );
+                                put( "network", null );
+                                put( "address", finalAddress );
+                                put( "tag", null );
+                            }});
+                        } else
+                        {
+                            for (var n = 0; Helpers.isLessThan(n, networkCount); n++)
+                            {
+                                Object networkCode = (networkCodes == null || n < 0 || n >= ((List<?>)networkCodes).size() ? null : ((List<?>)networkCodes).get(n));
+    final Object finalCode_2 = code;
+                                final Object finalAddress_2 = address;
+                                                            ((List<Object>)result).add(new HashMap<String, Object>() {{
+                                    put( "info", new HashMap<String, Object>() {{}} );
+                                    put( "currency", finalCode_2 );
+                                    put( "network", networkCode );
+                                    put( "address", finalAddress_2 );
+                                    put( "tag", null );
+                                }});
+                            }
+                        }
                     }
                 }
             }
@@ -2648,18 +2657,19 @@ public class Indodax extends IndodaxApi
         Object numParts = ((List<?>)parts).size();
         String tail = (String) Helpers.GetValue(parts, Helpers.subtract(numParts, 1));
         String digits = "0123456789";
-        Object tailLength = tail.length();
-        if (Helpers.isLessThan(tailLength, 1))
+        if (tail.length() < 1)
         {
             return orderId;
         }
-        for (var index = 0; Helpers.isLessThan(index, tailLength); index++)
+        Object index = 0;
+        while (Helpers.isLessThan(index, tail.length()))
         {
             Object character = Helpers.GetValue(tail, index);
             if (((String)digits).indexOf(((String)character)) < 0)
             {
                 return orderId;
             }
+            index = this.sum(index, 1);
         }
         return tail;
     }
@@ -3316,7 +3326,7 @@ public class Indodax extends IndodaxApi
      * @description fetch all deposits made to an account
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
-     * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+     * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
      * @param {int} [since] the earliest time in ms to fetch deposits for
      * @param {int} [limit] the maximum number of deposits structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -3517,16 +3527,14 @@ public class Indodax extends IndodaxApi
                 }
                 String clientRequestId = this.safeString(parameters, "clientOrderId", String.valueOf(this.milliseconds()));
                 parameters = this.omit(parameters, new ArrayList<Object>(Arrays.asList("bankCode", "clientOrderId")));
-                final Object finalBankCode = bankCode;
-                Map<String, Object> accountInfo = new HashMap<String, Object>() {{
-                    put( "accountNumber", address );
-                    put( "bankCodeForPix", finalBankCode );
-                }};
+                Object accountNumberJson = this.json(address);
+                Object bankCodeJson = this.json(bankCode);
+                String accountInfo = (((("{\"accountNumber\":" + accountNumberJson) + ",\"bankCodeForPix\":") + bankCodeJson) + "}");
                 Map<String, Object> fiatRequest = new HashMap<String, Object>() {{
                     put( "apiPaymentMethod", "bank_transfer" );
                     put( "currency", "idr" );
                     put( "amount", Indodax.this.parseToInt(amount) );
-                    put( "accountInfo", Indodax.this.json(accountInfo) );
+                    put( "accountInfo", accountInfo );
                     put( "clientRequestId", clientRequestId );
                 }};
                 Map<String, Object> fiatResponse = (this.v2PostFiatWithdraw(this.extend(fiatRequest, parameters))).join();

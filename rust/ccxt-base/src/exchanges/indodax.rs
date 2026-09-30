@@ -2503,7 +2503,7 @@ impl IndodaxCore {
  * @param {object} networks network map from getInfo
  * @param {string} currencyId currency id key
  * @param {string} code unified currency code
- * @returns {string|string[]|undefined} unified network code or a list of them
+ * @returns {string[]} unified network codes, one per network
  */
     pub fn v1_deposit_network(&self, mut networks: Value, mut currencyId: Value, mut code: Value) -> Value {
         let mut networkList: Value = self.safe_list(networks.clone(), currencyId.clone(), &[]);
@@ -2546,13 +2546,6 @@ impl IndodaxCore {
                 append_to_array(&mut parsed, to_upper(&networkCode));
             }
         }
-        }
-        let mut parsedCount: f64 = ((parsed.len() as i64) as f64);
-        if parsedCount < ((1i64) as f64) {
-            return Value::Null;
-        }
-        if (parsedCount == 1.0) {
-            return parsed.as_array().and_then(|__arr| __arr.get(0)).cloned().unwrap_or(Value::Null);
         }
         return parsed;
 
@@ -2665,28 +2658,50 @@ impl IndodaxCore {
         let mut result: Value = Value::from(vec![]);
         {
                         let mut i: Value = Value::Int(0);
-            let mut __for_first_225: bool = true;
-            while { if !__for_first_225 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_225 = false; i.as_f64().unwrap_or(f64::NAN) < ((addressKeys.len() as i64) as f64) } {
+            let mut __for_first_226: bool = true;
+            while { if !__for_first_226 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_226 = false; i.as_f64().unwrap_or(f64::NAN) < ((addressKeys.len() as i64) as f64) } {
             let mut marketId: Value = addressKeys.as_array().and_then(|__arr| match &i { Value::Int(__n) => __arr.get(*__n as usize), Value::Str(__s) => __s.parse::<usize>().ok().and_then(|__n| __arr.get(__n)), _ => None }).cloned().unwrap_or(Value::Null);
             let mut code: Value = self.safe_currency_code(marketId.clone(), &[]);
             let mut address: Value = self.safe_string(addresses.clone(), marketId.clone(), &[]);
             if (address != Value::Null) && ((codes == Value::Null) || self.in_array(code.clone(), codes.clone()).as_bool() == Some(true)) {
                 self.check_address(&[address.clone()]);
-                let mut network: Value = self.v1_deposit_network(networks.clone(), marketId, code.clone());
-                let mut finalNetwork: Value = network; // java req
+                let mut networkCodes: Value = self.v1_deposit_network(networks.clone(), marketId, code.clone());
+                let mut networkCount: f64 = ((networkCodes.len() as i64) as f64);
                 if (code != Value::Null) {
-                    append_to_array(&mut result, Value::Map({
-                        let mut m = indexmap::IndexMap::new();
-                            m.insert("info".to_string(), Value::Map({
+                    if networkCount < ((1i64) as f64) {
+                        append_to_array(&mut result, Value::Map({
+                            let mut m = indexmap::IndexMap::new();
+                                m.insert("info".to_string(), Value::Map({
     let mut m = indexmap::IndexMap::new();
     m
 }));
-                            m.insert("currency".to_string(), code);
-                            m.insert("network".to_string(), finalNetwork);
-                            m.insert("address".to_string(), address);
-                            m.insert("tag".to_string(), Value::Null);
-                        m
-                    }));
+                                m.insert("currency".to_string(), code.clone());
+                                m.insert("network".to_string(), Value::Null);
+                                m.insert("address".to_string(), address.clone());
+                                m.insert("tag".to_string(), Value::Null);
+                            m
+                        }));
+                    }  else {
+                        {
+                                                        let mut n: Value = Value::Int(0);
+                            let mut __for_first_225: bool = true;
+                            while { if !__for_first_225 { n = (match (&(n), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_225 = false; n.as_f64().unwrap_or(f64::NAN) < networkCount } {
+                            let mut networkCode: Value = networkCodes.as_array().and_then(|__arr| match &n { Value::Int(__n) => __arr.get(*__n as usize), Value::Str(__s) => __s.parse::<usize>().ok().and_then(|__n| __arr.get(__n)), _ => None }).cloned().unwrap_or(Value::Null);
+                            append_to_array(&mut result, Value::Map({
+                                let mut m = indexmap::IndexMap::new();
+                                    m.insert("info".to_string(), Value::Map({
+    let mut m = indexmap::IndexMap::new();
+    m
+}));
+                                    m.insert("currency".to_string(), code.clone());
+                                    m.insert("network".to_string(), networkCode);
+                                    m.insert("address".to_string(), address.clone());
+                                    m.insert("tag".to_string(), Value::Null);
+                                m
+                            }));
+                        }
+                        }
+                    }
                 }
             }
         }
@@ -2745,8 +2760,8 @@ impl IndodaxCore {
         });
         {
                         let mut i: Value = Value::Int(0);
-            let mut __for_first_226: bool = true;
-            while { if !__for_first_226 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_226 = false; i.as_f64().unwrap_or(f64::NAN) < ((balances.len() as i64) as f64) } {
+            let mut __for_first_227: bool = true;
+            while { if !__for_first_227 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_227 = false; i.as_f64().unwrap_or(f64::NAN) < ((balances.len() as i64) as f64) } {
             let mut entry: Value = balances.as_array().and_then(|__arr| match &i { Value::Int(__n) => __arr.get(*__n as usize), Value::Str(__s) => __s.parse::<usize>().ok().and_then(|__n| __arr.get(__n)), _ => None }).cloned().unwrap_or(Value::Null);
             let mut currencyId: Value = self.safe_string_k(entry.clone(), "asset", &[]);
             let mut code: Value = self.safe_currency_code(currencyId, &[]);
@@ -2925,20 +2940,17 @@ impl IndodaxCore {
         let mut numParts: Value = Value::Int(parts.len() as i64);
         let mut tail: Value = get_value(&parts, &(match (&(numParts), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x - y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 - *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x - *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x - y), _ => Value::Null }));
         let mut digits: Value = Value::Str("0123456789".into());
-        let mut tailLength: f64 = ((tail.len() as i64) as f64);
-        if tailLength < ((1i64) as f64) {
+        if ((tail.len() as i64) as f64) < ((1i64) as f64) {
             return orderId.as_str().map(str::to_owned);
         }
-        {
-                        let mut index: Value = Value::Int(0);
-            let mut __for_first_227: bool = true;
-            while { if !__for_first_227 { index = (match (&(index), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_227 = false; index.as_f64().unwrap_or(f64::NAN) < tailLength } {
+        let mut index: Value = Value::Int(0);
+        while index.as_f64().unwrap_or(f64::NAN) < ((tail.len() as i64) as f64) {
             let mut character: Value = get_value(&tail, &index);
             let mut character: Value = get_value(&tail, &index);
             if get_index_of(&digits, &character).as_f64().unwrap_or(f64::NAN) < ((0i64) as f64) {
                 return orderId.as_str().map(str::to_owned);
             }
-        }
+            index = self.sum(&[index.clone(), Value::Int(1)]);
         }
         return tail.as_str().map(str::to_owned);
 }
@@ -3575,7 +3587,7 @@ impl IndodaxCore {
  * @description fetch all deposits made to an account
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
- * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+ * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
  * @param {int} [since] the earliest time in ms to fetch deposits for
  * @param {int} [limit] the maximum number of deposits structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -3756,18 +3768,15 @@ impl IndodaxCore {
             }
             let mut clientRequestId: Value = self.safe_string_k(params.clone(), "clientOrderId", &[to_string_val(&self.milliseconds())]);
             params = self.omit(params.clone(), Value::from(vec![Value::Str("bankCode".into()), Value::Str("clientOrderId".into())]), &[]);
-            let mut accountInfo: Value = Value::Map({
-                let mut m = indexmap::IndexMap::new();
-                    m.insert("accountNumber".to_string(), address.clone());
-                    m.insert("bankCodeForPix".to_string(), bankCode);
-                m
-            });
+            let mut accountNumberJson: Value = json_stringify(&address);
+            let mut bankCodeJson: Value = json_stringify(&bankCode);
+            let mut accountInfo: Value = Value::Str(format!("{}{}", Value::Str(format!("{}{}", Value::Str(format!("{}{}", Value::Str(format!("{}{}", Value::Str("{\"accountNumber\":".into()), accountNumberJson).into()), Value::Str(",\"bankCodeForPix\":".into())).into()), bankCodeJson).into()), Value::Str("}".into())).into());
             let mut fiatRequest: Value = Value::Map({
                 let mut m = indexmap::IndexMap::new();
                     m.insert("apiPaymentMethod".to_string(), Value::Str("bank_transfer".into()));
                     m.insert("currency".to_string(), Value::Str("idr".into()));
                     m.insert("amount".to_string(), self.parse_to_int(amount.clone()));
-                    m.insert("accountInfo".to_string(), json_stringify(&accountInfo));
+                    m.insert("accountInfo".to_string(), accountInfo);
                     m.insert("clientRequestId".to_string(), clientRequestId);
                 m
             });

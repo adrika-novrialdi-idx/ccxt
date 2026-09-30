@@ -1926,7 +1926,7 @@ class indodax extends Exchange {
          * @param {array} $networks network map from getInfo
          * @param {string} $currencyId currency id key
          * @param {string} $code unified currency $code
-         * @return {string|string[]|null} unified network $code or a list of them
+         * @return {string[]} unified network codes, one per network
          */
         $networkList = $this->safe_list($networks, $currencyId);
         $networkIds = array();
@@ -1956,13 +1956,6 @@ class indodax extends Exchange {
             if ($networkCode !== null) {
                 $parsed[] = strtoupper($networkCode);
             }
-        }
-        $parsedCount = count($parsed);
-        if ($parsedCount < 1) {
-            return null;
-        }
-        if ($parsedCount === 1) {
-            return $parsed[0];
         }
         return $parsed;
     }
@@ -2008,7 +2001,7 @@ class indodax extends Exchange {
          *
          * @param {string[]} [$codes] list of unified currency $codes, required when options.tapiVersion is "2"
          * @param {array} [$params] extra parameters specific to the exchange API endpoint
-         * @param {string} [$params->network] unified $network $code, only used when options.tapiVersion is "2"
+         * @param {string} [$params->network] unified network $code, only used when options.tapiVersion is "2"
          * @return {array} a list of ~@link https://docs.ccxt.com/?id=$address-structure $address structures~
          */
         if ($this->is_tapi_v2()) {
@@ -2064,16 +2057,29 @@ class indodax extends Exchange {
             $address = $this->safe_string($addresses, $marketId);
             if (($address !== null) && (($codes === null) || ($this->in_array($code, $codes)))) {
                 $this->check_address($address);
-                $network = $this->v1_deposit_network($networks, $marketId, $code);
-                $finalNetwork = $network; // java req
+                $networkCodes = $this->v1_deposit_network($networks, $marketId, $code);
+                $networkCount = count($networkCodes);
                 if ($code !== null) {
-                    $result[] = array(
-                        'info' => array(),
-                        'currency' => $code,
-                        'network' => $finalNetwork,
-                        'address' => $address,
-                        'tag' => null,
-                    );
+                    if ($networkCount < 1) {
+                        $result[] = array(
+                            'info' => array(),
+                            'currency' => $code,
+                            'network' => null,
+                            'address' => $address,
+                            'tag' => null,
+                        );
+                    } else {
+                        for ($n = 0; $n < $networkCount; $n++) {
+                            $networkCode = $networkCodes[$n];
+                            $result[] = array(
+                                'info' => array(),
+                                'currency' => $code,
+                                'network' => $networkCode,
+                                'address' => $address,
+                                'tag' => null,
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -2269,15 +2275,16 @@ class indodax extends Exchange {
         $numParts = count($parts);
         $tail = $parts[$numParts - 1];
         $digits = '0123456789';
-        $tailLength = count($tail);
-        if ($tailLength < 1) {
+        if (strlen($tail) < 1) {
             return $orderId;
         }
-        for ($index = 0; $index < $tailLength; $index++) {
+        $index = 0;
+        while ($index < strlen($tail)) {
             $character = $tail[$index];
             if (mb_strpos($digits, $character) === false) {
                 return $orderId;
             }
+            $index = $this->sum($index, 1);
         }
         return $tail;
     }
@@ -2787,7 +2794,7 @@ class indodax extends Exchange {
          * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
          * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
          *
-         * @param {string} [$code] unified $currency $code-> Omitting $code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+         * @param {string} [$code] unified $currency $code-> Omitting $code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without $params->paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
          * @param {int} [$since] the earliest time in ms to fetch deposits for
          * @param {int} [$limit] the maximum number of deposits structures to retrieve
          * @param {array} [$params] extra parameters specific to the exchange API endpoint
@@ -2941,15 +2948,14 @@ class indodax extends Exchange {
             }
             $clientRequestId = $this->safe_string($params, 'clientOrderId', (string) $this->milliseconds());
             $params = $this->omit($params, array( 'bankCode', 'clientOrderId' ));
-            $accountInfo = array(
-                'accountNumber' => $address,
-                'bankCodeForPix' => $bankCode,
-            );
+            $accountNumberJson = $this->json($address);
+            $bankCodeJson = $this->json($bankCode);
+            $accountInfo = 'array("accountNumber":' . $accountNumberJson . ',"bankCodeForPix":' . $bankCodeJson . ')';
             $fiatRequest = array(
                 'apiPaymentMethod' => 'bank_transfer',
                 'currency' => 'idr',
                 'amount' => $this->parse_to_int($amount),
-                'accountInfo' => $this->json($accountInfo),
+                'accountInfo' => $accountInfo,
                 'clientRequestId' => $clientRequestId,
             );
             $fiatResponse = Async\await($this->v2PostFiatWithdraw($this->extend($fiatRequest, $params)));

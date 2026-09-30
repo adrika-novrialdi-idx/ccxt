@@ -2318,7 +2318,7 @@ func (this *Indodax) ParseTransactionStatus(status *string) *string {
  * @param {object} networks network map from getInfo
  * @param {string} currencyId currency id key
  * @param {string} code unified currency code
- * @returns {string|string[]|undefined} unified network code or a list of them
+ * @returns {string[]} unified network codes, one per network
  */
 func (this *Indodax) V1DepositNetwork(networks any, currencyId any, code any) any {
 	var networkList any = this.SafeList(networks, currencyId)
@@ -2359,18 +2359,6 @@ func (this *Indodax) V1DepositNetwork(networks any, currencyId any, code any) an
 		if networkCode != nil {
 			parsed = append(parsed, ToUpper(networkCode))
 		}
-	}
-	var parsedCount int = len(parsed)
-	if parsedCount < 1 {
-		return nil
-	}
-	if parsedCount == 1 {
-		return func() any {
-			if 0 >= 0 && 0 < len(parsed) {
-				return DerefScalar(parsed[0])
-			}
-			return nil
-		}()
 	}
 	return parsed
 }
@@ -2442,15 +2430,15 @@ func (this *Indodax) fetchDepositAddressesBody(ch chan any, optionalArgs ...any)
 	_ = params
 	if EvalTruthy(this.IsTapiV2()) {
 
-		retRes193919 := (<-this.DepositAddressesV2Async(codes, params))
-		PanicOnError(retRes193919)
-		ch <- retRes193919
+		retRes193219 := (<-this.DepositAddressesV2Async(codes, params))
+		PanicOnError(retRes193219)
+		ch <- retRes193219
 		return nil
 	}
 	if this.Markets == nil {
 
-		retRes194212 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes194212)
+		retRes193512 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes193512)
 	}
 
 	response := (<-this.PrivatePostGetInfo(params))
@@ -2501,16 +2489,29 @@ func (this *Indodax) fetchDepositAddressesBody(ch chan any, optionalArgs ...any)
 		var address *string = this.SafeString(addresses, marketId)
 		if (address != nil) && ((codes == nil) || (this.InArray(code, codes))) {
 			this.CheckAddress(address)
-			var network any = this.V1DepositNetwork(networks, marketId, code)
-			var finalNetwork any = network // java req
+			var networkCodes any = this.V1DepositNetwork(networks, marketId, code)
+			var networkCount int = GetArrayLength(networkCodes)
 			if code != nil {
-				result = append(result, map[string]any{
-					"info":     map[string]any{},
-					"currency": code,
-					"network":  finalNetwork,
-					"address":  address,
-					"tag":      nil,
-				})
+				if networkCount < 1 {
+					result = append(result, map[string]any{
+						"info":     map[string]any{},
+						"currency": code,
+						"network":  nil,
+						"address":  address,
+						"tag":      nil,
+					})
+				} else {
+					for n := 0; n < networkCount; n++ {
+						var networkCode any = GetValue(networkCodes, n)
+						result = append(result, map[string]any{
+							"info":     map[string]any{},
+							"currency": code,
+							"network":  networkCode,
+							"address":  address,
+							"tag":      nil,
+						})
+					}
+				}
 			}
 		}
 	}
@@ -2540,8 +2541,8 @@ func (this *Indodax) balanceV2Body(ch chan any, optionalArgs ...any) any {
 	_ = params
 	if this.Markets == nil {
 
-		retRes201812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes201812)
+		retRes202412 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes202412)
 	}
 	var request map[string]any = map[string]any{}
 	var omitZeroBalances *bool = this.SafeBool(params, "omitZeroBalances")
@@ -2738,15 +2739,16 @@ func (this *Indodax) V2OrderId(orderId any) any {
 	var numParts int = len(parts)
 	var tail any = GetValue(parts, numParts-1)
 	var digits string = "0123456789"
-	var tailLength int = GetLength(tail)
-	if tailLength < 1 {
+	if GetLength(tail) < 1 {
 		return orderId
 	}
-	for index := 0; index < tailLength; index++ {
+	var index any = 0
+	for IsLessThan(index, GetLength(tail)) {
 		var character any = GetValue(tail, index)
 		if GetIndexOf(digits, character) < 0 {
 			return orderId
 		}
+		index = this.Sum(index, 1)
 	}
 	return tail
 }
@@ -2774,8 +2776,8 @@ func (this *Indodax) orderV2Body(ch chan any, id any, optionalArgs ...any) any {
 	_ = params
 	if this.Markets == nil {
 
-		retRes222612 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes222612)
+		retRes223312 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes223312)
 	}
 	var orderRequest any = this.V2OrderRequest(id, symbol, params)
 	var market any = GetValue(orderRequest, 0)
@@ -2817,8 +2819,8 @@ func (this *Indodax) openOrdersV2Body(ch chan any, optionalArgs ...any) any {
 	_ = params
 	if this.Markets == nil {
 
-		retRes224812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes224812)
+		retRes225512 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes225512)
 	}
 	var market any = nil
 	var request map[string]any = map[string]any{}
@@ -2887,8 +2889,8 @@ func (this *Indodax) historyV2Body(ch chan any, historyKind any, symbol any, opt
 	_ = params
 	if this.Markets == nil {
 
-		retRes229512 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes229512)
+		retRes230212 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes230212)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	var paginate *bool = this.SafeBool(params, "paginate", false)
@@ -3058,8 +3060,8 @@ func (this *Indodax) placeOrderV2Body(ch chan any, symbol any, orderType any, si
 	_ = params
 	if this.Markets == nil {
 
-		retRes240412 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes240412)
+		retRes241112 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes241112)
 	}
 	var market map[string]any = MapTyped(this.Market(symbol))
 	if IsEqual(side, nil) {
@@ -3141,8 +3143,8 @@ func (this *Indodax) removeOrderV2Body(ch chan any, id any, optionalArgs ...any)
 	_ = params
 	if this.Markets == nil {
 
-		retRes247012 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes247012)
+		retRes247712 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes247712)
 	}
 	var orderRequest any = this.V2OrderRequest(id, symbol, params)
 	var market any = GetValue(orderRequest, 0)
@@ -3185,8 +3187,8 @@ func (this *Indodax) depositAddressesV2Body(ch chan any, optionalArgs ...any) an
 	}
 	if this.Markets == nil {
 
-		retRes249712 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes249712)
+		retRes250412 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes250412)
 	}
 	var networkCode any = nil
 	networkCodeparamsVariable := this.HandleNetworkCodeAndParams(params)
@@ -3461,7 +3463,7 @@ func (this *Indodax) fiatHistoryV2Body(ch chan any, direction any, optionalArgs 
  * @description fetch all deposits made to an account
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
- * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+ * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
  * @param {int} [since] the earliest time in ms to fetch deposits for
  * @param {int} [limit] the maximum number of deposits structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -3490,8 +3492,8 @@ func (this *Indodax) fetchDepositsBody(ch chan any, optionalArgs ...any) any {
 	}
 	if this.Markets == nil {
 
-		retRes270812 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes270812)
+		retRes271512 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes271512)
 	}
 	var until *int64 = this.SafeInteger(params, "until")
 	params = this.Omit(params, []any{"until"})
@@ -3554,8 +3556,8 @@ func (this *Indodax) fetchWithdrawalsBody(ch chan any, optionalArgs ...any) any 
 	}
 	if this.Markets == nil {
 
-		retRes274412 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes274412)
+		retRes275112 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes275112)
 	}
 	var until *int64 = this.SafeInteger(params, "until")
 	params = this.Omit(params, []any{"until"})
@@ -3684,8 +3686,8 @@ func (this *Indodax) sendWithdrawV2Body(ch chan any, code any, amount any, addre
 	params = GetValue(tagparamsVariable, 1)
 	if this.Markets == nil {
 
-		retRes283612 := (<-this.LoadMarketsAsync())
-		PanicOnError(retRes283612)
+		retRes284312 := (<-this.LoadMarketsAsync())
+		PanicOnError(retRes284312)
 	}
 	var currency map[string]any = MapTyped(this.Currency(code))
 	if GetValue(currency, "code") == "IDR" {
@@ -3695,15 +3697,14 @@ func (this *Indodax) sendWithdrawV2Body(ch chan any, code any, amount any, addre
 		}
 		var clientRequestId *string = this.SafeString(params, "clientOrderId", ToString(this.Milliseconds()))
 		params = this.Omit(params, []any{"bankCode", "clientOrderId"})
-		var accountInfo map[string]any = map[string]any{
-			"accountNumber":  address,
-			"bankCodeForPix": bankCode,
-		}
+		var accountNumberJson any = this.Json(address)
+		var bankCodeJson any = this.Json(bankCode)
+		var accountInfo any = Add(Add(Add(Add("{\"accountNumber\":", accountNumberJson), ",\"bankCodeForPix\":"), bankCodeJson), "}")
 		var fiatRequest map[string]any = map[string]any{
 			"apiPaymentMethod": "bank_transfer",
 			"currency":         "idr",
 			"amount":           this.ParseToInt(amount),
-			"accountInfo":      this.Json(accountInfo),
+			"accountInfo":      accountInfo,
 			"clientRequestId":  clientRequestId,
 		}
 
@@ -3879,13 +3880,13 @@ func (this *Indodax) requestBody(ch chan any, path any, optionalArgs ...any) any
 							panic(e)
 						}
 
-						retRes297512 := (<-this.LoadTimeDifferenceAsync())
-						PanicOnError(retRes297512)
+						retRes298112 := (<-this.LoadTimeDifferenceAsync())
+						PanicOnError(retRes298112)
 						this.Options.Store("timestampAdjusted", true)
 
-						retRes297719 := (<-this.Fetch2Async(path, api, method, params, headers, body, config))
-						PanicOnError(retRes297719)
-						ch <- retRes297719
+						retRes298319 := (<-this.Fetch2Async(path, api, method, params, headers, body, config))
+						PanicOnError(retRes298319)
+						ch <- retRes298319
 						chSent = true
 						return nil
 
@@ -3893,9 +3894,9 @@ func (this *Indodax) requestBody(ch chan any, path any, optionalArgs ...any) any
 				}
 			}()
 
-			retRes296919 := (<-this.Fetch2Async(path, api, method, params, headers, body, config))
-			PanicOnError(retRes296919)
-			ch <- retRes296919
+			retRes297519 := (<-this.Fetch2Async(path, api, method, params, headers, body, config))
+			PanicOnError(retRes297519)
+			ch <- retRes297519
 			chSent = true
 			return nil
 
@@ -4559,7 +4560,7 @@ func (this *Indodax) FetchMyTrades(options ...FetchMyTradesOptions) ([]Trade, er
  * @description fetch all deposits made to an account
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
- * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+ * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
  * @param {int} [since] the earliest time in ms to fetch deposits for
  * @param {int} [limit] the maximum number of deposits structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint

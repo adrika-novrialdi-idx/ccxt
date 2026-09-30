@@ -1738,7 +1738,7 @@ class indodax(Exchange, ImplicitAPI):
         :param dict networks: network map from getInfo
         :param str currencyId: currency id key
         :param str code: unified currency code
-        :returns string|str[]|None: unified network code or a list of them
+        :returns str[]: unified network codes, one per network
         """
         networkList = self.safe_list(networks, currencyId)
         networkIds = []
@@ -1761,11 +1761,6 @@ class indodax(Exchange, ImplicitAPI):
             networkCode = self.network_id_to_code(networkIds[i], code)
             if networkCode is not None:
                 parsed.append(networkCode.upper())
-        parsedCount = len(parsed)
-        if parsedCount < 1:
-            return None
-        if parsedCount == 1:
-            return parsed[0]
         return parsed
 
     async def fetch_deposit_address(self, code: str, params: dict = {}) -> DepositAddress:
@@ -1852,16 +1847,27 @@ class indodax(Exchange, ImplicitAPI):
             address = self.safe_string(addresses, marketId)
             if (address is not None) and ((codes is None) or (self.in_array(code, codes))):
                 self.check_address(address)
-                network = self.v1_deposit_network(networks, marketId, code)
-                finalNetwork = network  # java req
+                networkCodes = self.v1_deposit_network(networks, marketId, code)
+                networkCount = len(networkCodes)
                 if code is not None:
-                    result.append({
-                        'info': {},
-                        'currency': code,
-                        'network': finalNetwork,
-                        'address': address,
-                        'tag': None,
-                    })
+                    if networkCount < 1:
+                        result.append({
+                            'info': {},
+                            'currency': code,
+                            'network': None,
+                            'address': address,
+                            'tag': None,
+                        })
+                    else:
+                        for n in range(0, networkCount):
+                            networkCode = networkCodes[n]
+                            result.append({
+                                'info': {},
+                                'currency': code,
+                                'network': networkCode,
+                                'address': address,
+                                'tag': None,
+                            })
         return result
 
     async def balance_v2(self, params: dict = {}) -> Balances:
@@ -2033,13 +2039,14 @@ class indodax(Exchange, ImplicitAPI):
         numParts = len(parts)
         tail = parts[numParts - 1]
         digits = '0123456789'
-        tailLength = len(tail)
-        if tailLength < 1:
+        if len(tail) < 1:
             return orderId
-        for index in range(0, tailLength):
+        index = 0
+        while(index < len(tail)):
             character = tail[index]
             if digits.find(character) < 0:
                 return orderId
+            index = self.sum(index, 1)
         return tail
 
     async def order_v2(self, id: str, symbol: Str = None, params: dict = {}) -> Order:
@@ -2431,7 +2438,7 @@ class indodax(Exchange, ImplicitAPI):
         https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
         https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
 
-        :param str [code]: unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+        :param str [code]: unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
         :param int [since]: the earliest time in ms to fetch deposits for
         :param int [limit]: the maximum number of deposits structures to retrieve
         :param dict [params]: extra parameters specific to the exchange API endpoint
@@ -2560,15 +2567,14 @@ class indodax(Exchange, ImplicitAPI):
                 raise ArgumentsRequired(self.id + ' withdraw() requires a params.bankCode for IDR, the 3-digit bank code')
             clientRequestId = self.safe_string(params, 'clientOrderId', str(self.milliseconds()))
             params = self.omit(params, ['bankCode', 'clientOrderId'])
-            accountInfo = {
-                'accountNumber': address,
-                'bankCodeForPix': bankCode,
-            }
+            accountNumberJson = self.json(address)
+            bankCodeJson = self.json(bankCode)
+            accountInfo = '{"accountNumber":' + accountNumberJson + ',"bankCodeForPix":' + bankCodeJson + '}'
             fiatRequest = {
                 'apiPaymentMethod': 'bank_transfer',
                 'currency': 'idr',
                 'amount': self.parse_to_int(amount),
-                'accountInfo': self.json(accountInfo),
+                'accountInfo': accountInfo,
                 'clientRequestId': clientRequestId,
             }
             fiatResponse = await self.v2PostFiatWithdraw(self.extend(fiatRequest, params))

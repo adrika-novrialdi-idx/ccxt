@@ -2047,7 +2047,7 @@ public partial class indodax : Exchange
      * @param {object} networks network map from getInfo
      * @param {string} currencyId currency id key
      * @param {string} code unified currency code
-     * @returns {string|string[]|undefined} unified network code or a list of them
+     * @returns {string[]} unified network codes, one per network
      */
     public virtual object v1DepositNetwork(object networks, object currencyId, object code)
     {
@@ -2089,15 +2089,6 @@ public partial class indodax : Exchange
             {
                 ((IList<object>)parsed).Add(((string)networkCode).ToUpper());
             }
-        }
-        int parsedCount = (parsed?.Count ?? 0);
-        if (parsedCount < 1)
-        {
-            return null;
-        }
-        if ((parsedCount == 1))
-        {
-            return getValue(parsed, 0);
         }
         return parsed;
     }
@@ -2201,17 +2192,33 @@ public partial class indodax : Exchange
             if (((address != null)) && (((codes == null)) || (this.inArray(code, codes))))
             {
                 this.checkAddress(address);
-                object network = this.v1DepositNetwork(networks, marketId, code);
-                object finalNetwork = network; // java req
+                object networkCodes = this.v1DepositNetwork(networks, marketId, code);
+                int networkCount = getArrayLength(networkCodes);
                 if ((code != null))
                 {
-                    ((IList<object>)result).Add(new Dictionary<string, object>() {
-                        { "info", new Dictionary<string, object>() {} },
-                        { "currency", code },
-                        { "network", finalNetwork },
-                        { "address", address },
-                        { "tag", null },
-                    });
+                    if (networkCount < 1)
+                    {
+                        ((IList<object>)result).Add(new Dictionary<string, object>() {
+                            { "info", new Dictionary<string, object>() {} },
+                            { "currency", code },
+                            { "network", null },
+                            { "address", address },
+                            { "tag", null },
+                        });
+                    } else
+                    {
+                        for (int n = 0; n < networkCount; n++)
+                        {
+                            object networkCode = getValue(networkCodes, n);
+                            ((IList<object>)result).Add(new Dictionary<string, object>() {
+                                { "info", new Dictionary<string, object>() {} },
+                                { "currency", code },
+                                { "network", networkCode },
+                                { "address", address },
+                                { "tag", null },
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -2434,18 +2441,19 @@ public partial class indodax : Exchange
         int numParts = parts.Count;
         string? tail = ((string)getValue(parts, (numParts - 1)));
         string digits = "0123456789";
-        int tailLength = ((string)tail).Length;
-        if (tailLength < 1)
+        if (((string)tail).Length < 1)
         {
             return orderId;
         }
-        for (int index = 0; index < tailLength; index++)
+        object index = 0;
+        while (isLessThan(index, ((string)tail).Length))
         {
             object character = getValue(tail, index);
             if (((string)digits).IndexOf(((string)character), StringComparison.Ordinal) < 0)
             {
                 return orderId;
             }
+            index = this.sum(index, 1);
         }
         return tail;
     }
@@ -3020,7 +3028,7 @@ public partial class indodax : Exchange
      * @description fetch all deposits made to an account
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
-     * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+     * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
      * @param {int} [since] the earliest time in ms to fetch deposits for
      * @param {int} [limit] the maximum number of deposits structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -3195,15 +3203,14 @@ public partial class indodax : Exchange
             }
             string? clientRequestId = this.safeString(parameters, "clientOrderId", ((object)this.milliseconds()).ToString());
             parameters = this.omit(parameters, new List<object>() {"bankCode", "clientOrderId"});
-            Dictionary<string, object> accountInfo = new Dictionary<string, object>() {
-                { "accountNumber", address },
-                { "bankCodeForPix", bankCode },
-            };
+            string accountNumberJson = this.json(address);
+            string bankCodeJson = this.json(bankCode);
+            string accountInfo = (((("{\"accountNumber\":" + accountNumberJson) + ",\"bankCodeForPix\":") + bankCodeJson) + "}");
             Dictionary<string, object> fiatRequest = new Dictionary<string, object>() {
                 { "apiPaymentMethod", "bank_transfer" },
                 { "currency", "idr" },
                 { "amount", this.parseToInt(amount) },
-                { "accountInfo", this.json(accountInfo) },
+                { "accountInfo", accountInfo },
                 { "clientRequestId", clientRequestId },
             };
             Dictionary<string, object> fiatResponse = await this.v2PostFiatWithdraw(this.extend(fiatRequest, parameters));
