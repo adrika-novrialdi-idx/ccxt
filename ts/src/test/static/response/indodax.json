@@ -879,10 +879,14 @@
                     {
                         "info": {},
                         "currency": "ETH",
-                        "network": [
-                            "ETH",
-                            "ARB"
-                        ],
+                        "network": "ETH",
+                        "address": "0xa6fd81330501442e8dff403f966b6e023a53763e",
+                        "tag": null
+                    },
+                    {
+                        "info": {},
+                        "currency": "ETH",
+                        "network": "ARB",
                         "address": "0xa6fd81330501442e8dff403f966b6e023a53763e",
                         "tag": null
                     }
