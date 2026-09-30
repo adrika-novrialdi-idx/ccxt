@@ -2874,6 +2874,7 @@ class NewTranspiler {
         // Remove unreachable "return null;" after throw/return statements (ast-transpiler 0.0.80)
         content = content.replace(/throw ([^;]+) ;\n\s*return null;/g, 'throw $1 ;');
         content = this.removeUnreachableReturnNull(content);
+        content = this.removeReturnNullAfterTerminatingTryCatch(content);
         // Remove unreachable "return null;" after simple if/else where both branches
         // directly return (single-line return in each branch, no nested control flow)
         // Handle if/else where else has return (not throw): remove unreachable return null
@@ -2919,6 +2920,111 @@ class NewTranspiler {
         }
         content = this.addDeprecatedAnnotations(content);
         return this.createGeneratedHeader().join('\n') + '\n' + javaImports + content;
+    }
+
+    /**
+     * Remove unreachable "return null;" after try/catch when both the try and the catch
+     * end in return or throw. javac rejects that trailing return.
+     */
+    removeReturnNullAfterTerminatingTryCatch(content: string): string {
+        const lines = content.split('\n');
+        const result: string[] = [];
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].trim() === 'return null;' && this.tryCatchBeforeLineTerminates(lines, i)) {
+                continue;
+            }
+            result.push(lines[i]);
+        }
+        return result.join('\n');
+    }
+
+    tryCatchBeforeLineTerminates(lines: string[], returnIndex: number): boolean {
+        let closeLine = returnIndex - 1;
+        while (closeLine >= 0 && lines[closeLine].trim() === '') {
+            closeLine--;
+        }
+        if (closeLine < 0 || lines[closeLine].trim() !== '}') {
+            return false;
+        }
+        const catchOpen = this.matchingBraceOpen(lines, closeLine);
+        if (catchOpen < 0 || !this.lineIsCatch(lines, catchOpen)) {
+            return false;
+        }
+        if (!this.blockEndsWithTermination(lines, catchOpen, closeLine)) {
+            return false;
+        }
+        let tryClose = catchOpen - 1;
+        while (tryClose >= 0 && lines[tryClose].trim() === '') {
+            tryClose--;
+        }
+        if (tryClose < 0) {
+            return false;
+        }
+        const tryCloseText = lines[tryClose].trim();
+        if (tryCloseText.indexOf('catch') === -1 || tryCloseText[0] !== '}') {
+            return false;
+        }
+        const tryOpen = this.matchingBraceOpen(lines, tryClose);
+        if (tryOpen < 0) {
+            return false;
+        }
+        const tryHeader = (tryOpen > 0) ? lines[tryOpen - 1].trim() : '';
+        if (tryHeader !== 'try' && lines[tryOpen].trim().indexOf('try') !== 0) {
+            return false;
+        }
+        return this.blockEndsWithTermination(lines, tryOpen, tryClose);
+    }
+
+    lineIsCatch(lines: string[], openLine: number): boolean {
+        const own = lines[openLine].trim();
+        if (own.indexOf('catch') !== -1) {
+            return true;
+        }
+        if (openLine === 0) {
+            return false;
+        }
+        return lines[openLine - 1].trim().indexOf('catch') !== -1;
+    }
+
+    matchingBraceOpen(lines: string[], closeLine: number): number {
+        let depth = 0;
+        for (let k = closeLine; k >= 0; k--) {
+            const line = lines[k];
+            for (let c = line.length - 1; c >= 0; c--) {
+                const ch = line[c];
+                if (ch === '}') {
+                    depth++;
+                } else if (ch === '{') {
+                    depth--;
+                    if (depth === 0) {
+                        return k;
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+    blockEndsWithTermination(lines: string[], openLine: number, closeLine: number): boolean {
+        let depth = 0;
+        let last = '';
+        for (let k = openLine; k <= closeLine; k++) {
+            const text = lines[k].trim();
+            if (k !== openLine && k !== closeLine && depth === 0 && text !== '' && text !== '{' && text !== '}' && text.indexOf('//') !== 0) {
+                last = text;
+            }
+            for (let c = 0; c < lines[k].length; c++) {
+                if (k === openLine && c <= lines[k].indexOf('{')) {
+                    continue;
+                }
+                if (lines[k][c] === '{') {
+                    depth++;
+                } else if (lines[k][c] === '}') {
+                    depth--;
+                }
+            }
+        }
+        return last.indexOf('return ') === 0 || last.indexOf('return;') === 0 || last.indexOf('throw ') === 0;
     }
 
     /**
