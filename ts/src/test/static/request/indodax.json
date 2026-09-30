@@ -83,7 +83,7 @@
             {
                 "description": "TAPI v2 cancel does not require side",
                 "method": "cancelOrder",
-                "url": "https://api.indodax.com/api/v2/order?timestamp=1700000000000&recvWindow=5000&symbol=btcidr&fullOrderId=btcidr-limit-6423",
+                "url": "https://api.indodax.com/api/v2/order?timestamp=1700000000000&recvWindow=5000&symbol=btcidr&orderId=6423",
                 "input": [
                     "btcidr-limit-6423",
                     "BTC/IDR"
@@ -95,9 +95,9 @@
         ],
         "fetchOrder": [
             {
-                "description": "TAPI v2 get order by fullOrderId",
+                "description": "TAPI v2 get order sends the numeric orderId",
                 "method": "fetchOrder",
-                "url": "https://api.indodax.com/api/v2/order?timestamp=1700000000000&recvWindow=5000&symbol=btcidr&fullOrderId=btcidr-limit-6423",
+                "url": "https://api.indodax.com/api/v2/order?timestamp=1700000000000&recvWindow=5000&symbol=btcidr&orderId=6423",
                 "input": [
                     "btcidr-limit-6423",
                     "BTC/IDR"
@@ -230,10 +230,29 @@
                     "1234567890",
                     null,
                     {
-                        "clientOrderId": "fiat-1"
+                        "clientOrderId": "fiat-1",
+                        "bankCode": "014"
                     }
                 ],
-                "output": "timestamp=1700000000000&recvWindow=5000&apiPaymentMethod=bank_transfer&currency=idr&amount=150000&accountInfo=%7B%22accountNumber%22%3A%221234567890%22%7D&clientRequestId=fiat-1",
+                "output": "timestamp=1700000000000&recvWindow=5000&apiPaymentMethod=bank_transfer&currency=idr&amount=150000&accountInfo=%7B%22accountNumber%22%3A%221234567890%22%2C%22bankCodeForPix%22%3A%22014%22%7D&clientRequestId=fiat-1",
+                "options": {
+                    "tapiVersion": "2"
+                }
+            },
+            {
+                "description": "TAPI v2 crypto withdraw sends the memo as addressTag",
+                "method": "withdraw",
+                "url": "https://api.indodax.com/api/v2/capital/withdraw/apply",
+                "input": [
+                    "BTC",
+                    0.01,
+                    "1FZdVHtiBqMrWdjPyRPULCUceZPJ2WLCsB",
+                    "12345",
+                    {
+                        "clientOrderId": "wd-1"
+                    }
+                ],
+                "output": "timestamp=1700000000000&recvWindow=5000&coin=btc&address=1FZdVHtiBqMrWdjPyRPULCUceZPJ2WLCsB&amount=0.01&withdrawOrderId=wd-1&addressTag=12345",
                 "options": {
                     "tapiVersion": "2"
                 }
