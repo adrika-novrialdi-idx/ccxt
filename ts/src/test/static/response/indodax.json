@@ -346,7 +346,7 @@
         ],
         "fetchDeposits": [
             {
-                "description": "TAPI v2 crypto deposit uses depositStatus",
+                "description": "TAPI v2 crypto deposit times are milliseconds",
                 "method": "fetchDeposits",
                 "input": [
                     "BTC"
@@ -356,32 +356,33 @@
                 },
                 "httpResponse": [
                     {
-                        "id": "d1",
-                        "amount": "10",
+                        "id": "3602369",
+                        "amount": "0.001",
                         "coin": "BTC",
-                        "txId": "tx1",
-                        "address": "addr1",
-                        "network": "erc20",
-                        "depositStatus": "success",
-                        "insertTime": "2024-01-02 15:04:05",
-                        "completeTime": "2024-01-02 16:04:05"
+                        "txId": "c816aeb35a5b42f389970325a32aff69bb6b2126784dcda8f23b9dd9570d6573",
+                        "address": "1FZdVHtiBqMrWdjPyRPULCUceZPJ2WLCsB",
+                        "addressTag": "",
+                        "network": "",
+                        "status": "success",
+                        "insertTime": 1661493146000,
+                        "completeTime": 1661493146000
                     }
                 ],
                 "parsedResponse": [
                     {
-                        "id": "d1",
-                        "txid": "tx1",
-                        "timestamp": 1704207845000,
-                        "datetime": "2024-01-02T15:04:05.000Z",
-                        "network": "erc20",
+                        "id": "3602369",
+                        "txid": "c816aeb35a5b42f389970325a32aff69bb6b2126784dcda8f23b9dd9570d6573",
+                        "timestamp": 1661493146000,
+                        "datetime": "2022-08-26T05:52:26.000Z",
+                        "network": null,
                         "addressFrom": null,
-                        "address": "addr1",
+                        "address": "1FZdVHtiBqMrWdjPyRPULCUceZPJ2WLCsB",
                         "addressTo": null,
-                        "amount": 10,
+                        "amount": 0.001,
                         "type": "deposit",
                         "currency": "BTC",
                         "status": "ok",
-                        "updated": 1704211445000,
+                        "updated": 1661493146000,
                         "tagFrom": null,
                         "tag": null,
                         "tagTo": null,
@@ -389,16 +390,16 @@
                         "internal": null,
                         "fee": null,
                         "info": {
-                            "id": "d1",
-                            "amount": "10",
+                            "id": "3602369",
+                            "amount": "0.001",
                             "coin": "BTC",
-                            "txId": "tx1",
-                            "address": "addr1",
-                            "network": "erc20",
-                            "depositStatus": "success",
-                            "insertTime": "2024-01-02 15:04:05",
-                            "completeTime": "2024-01-02 16:04:05",
-                            "txType": "deposit"
+                            "txId": "c816aeb35a5b42f389970325a32aff69bb6b2126784dcda8f23b9dd9570d6573",
+                            "address": "1FZdVHtiBqMrWdjPyRPULCUceZPJ2WLCsB",
+                            "addressTag": "",
+                            "network": "",
+                            "status": "success",
+                            "insertTime": 1661493146000,
+                            "completeTime": 1661493146000
                         }
                     }
                 ]
