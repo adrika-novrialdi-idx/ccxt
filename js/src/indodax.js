@@ -7,7 +7,7 @@
 //  ---------------------------------------------------------------------------
 import { sha256, sha512 } from '@noble/hashes/sha2.js';
 import Exchange from './abstract/indodax.js';
-import { ExchangeError, ArgumentsRequired, InsufficientFunds, InvalidOrder, OrderNotFound, AuthenticationError, BadSymbol, NotSupported, InvalidNonce, RateLimitExceeded, OnMaintenance, InvalidAddress } from './base/errors.js';
+import { ExchangeError, ArgumentsRequired, InsufficientFunds, InvalidOrder, OrderNotFound, AuthenticationError, BadSymbol, NotSupported, InvalidNonce, RateLimitExceeded, OnMaintenance, InvalidAddress, BadRequest, ExchangeNotAvailable } from './base/errors.js';
 import { TICK_SIZE } from './base/functions/number.js';
 import { Precise } from './base/Precise.js';
 //  ---------------------------------------------------------------------------
@@ -238,18 +238,26 @@ export default class indodax extends Exchange {
                     '-1003': RateLimitExceeded,
                     '-2010': InvalidOrder,
                     '-4026': InsufficientFunds,
-                    '-1102': ArgumentsRequired,
+                    '-1102': BadRequest,
+                    '-1001': ExchangeNotAvailable,
+                    '-1099': BadRequest,
+                    '-1016': OnMaintenance,
+                    '1109': BadRequest,
+                    '1112': OrderNotFound,
                     '-1130': InvalidOrder,
                     '-1111': InvalidOrder,
                     '-4022': InvalidOrder,
                     '-4023': InvalidOrder,
                     '-4033': InvalidAddress,
                     '-4035': InvalidAddress,
+                    '-4039': BadRequest,
+                    '-4060': InsufficientFunds,
                     '-4019': InvalidOrder,
                 },
                 'broad': {
                     'Minimum price': InvalidOrder,
                     'Minimum order': InvalidOrder,
+                    'alance': InsufficientFunds,
                 },
             },
             'timeframes': {
@@ -746,21 +754,8 @@ export default class indodax extends Exchange {
     }
     /**
      * @method
-     * @name indodax#fetchFundingLimits
-     * @description fetch the deposit and withdrawal limits for a currency
-     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md
-     * @param {string[]|undefined} codes unified currency codes
-     * @param {object} [params] extra parameters specific to the exchange API endpoint
-     * @returns {object} a [funding limits structure]{@link https://docs.ccxt.com/?id=funding-limits-structure}
-     */
-    async fetchFundingLimits(codes = undefined, params = {}) {
-        throw new NotSupported(this.id + ' fetchFundingLimits() is not supported yet');
-    }
-    /**
-     * @method
      * @name indodax#editOrder
      * @description edit a trade order
-     * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
      * @param {string} id order id
      * @param {string} symbol unified symbol of the market to edit an order in
      * @param {string} type 'market' or 'limit'
@@ -1569,7 +1564,7 @@ export default class indodax extends Exchange {
      * @description fetch history of deposits and withdrawals
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#transaction-history-endpoints
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
-     * @param {string} [code] unified currency code for the currency of the deposit/withdrawals, default is undefined
+     * @param {string} [code] unified currency code. On TAPI v2, omitting code returns only BTC crypto history plus IDR fiat history, because the exchange defaults coin to BTC
      * @param {int} [since] timestamp in ms of the earliest deposit/withdrawal, default is undefined
      * @param {int} [limit] max number of deposit/withdrawals to return, default is undefined
      * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -2153,9 +2148,34 @@ export default class indodax extends Exchange {
             request['origClientOrderId'] = clientOrderId;
         }
         else {
-            request['fullOrderId'] = id;
+            request['orderId'] = this.v2OrderId(id);
         }
         return [market, request, params];
+    }
+    /**
+     * @ignore
+     * @method
+     * @name indodax#v2OrderId
+     * @description numeric id for GET and DELETE /api/v2/order. fullOrderId stays the unified id
+     * @param {string} orderId unified id, a number or a fullOrderId such as btcidr-limit-6423
+     * @returns {string} numeric order id
+     */
+    v2OrderId(orderId) {
+        const parts = orderId.split('-');
+        const numParts = parts.length;
+        const tail = parts[numParts - 1];
+        const digits = '0123456789';
+        const tailLength = tail.length;
+        if (tailLength < 1) {
+            return orderId;
+        }
+        for (let index = 0; index < tailLength; index++) {
+            const character = tail[index];
+            if (digits.indexOf(character) < 0) {
+                return orderId;
+            }
+        }
+        return tail;
     }
     /**
      * @ignore
@@ -2237,45 +2257,27 @@ export default class indodax extends Exchange {
             await this.loadMarkets();
         }
         const market = this.market(symbol);
-        params = this.omit(params, ['symbol', 'startTime', 'endTime', 'limit']);
+        const paginate = this.safeBool(params, 'paginate', false);
+        params = this.omit(params, ['symbol', 'startTime', 'endTime', 'limit', 'paginate']);
         const maxSpan = 7 * 24 * 60 * 60 * 1000;
+        const windows = this.windowV2(since, until, maxSpan);
+        const numWindows = windows.length;
+        if ((numWindows > 1) && (paginate !== true)) {
+            throw new BadRequest(this.id + ' ' + historyKind + ' history range exceeds 7 days, pass params.paginate true to request each window');
+        }
         const requestLimit = this.clampV2Limit(limit);
         const result = [];
-        let windowStart = since;
-        let windowEnd = until;
-        if ((windowStart === undefined) && (windowEnd === undefined)) {
+        for (let i = 0; i < numWindows; i++) {
+            const window = windows[i];
             const request = {
                 'symbol': this.tapiV2Symbol(market),
             };
-            if (requestLimit !== undefined) {
-                request['limit'] = requestLimit;
+            if (window[0] !== undefined) {
+                request['startTime'] = window[0];
             }
-            let response = undefined;
-            if (historyKind === 'orders') {
-                response = await this.v2GetOrderHistories(this.extend(request, params));
+            if (window[1] !== undefined) {
+                request['endTime'] = window[1];
             }
-            else {
-                response = await this.v2GetMyTrades(this.extend(request, params));
-            }
-            return this.safeList(response, 'data', []);
-        }
-        if (windowEnd === undefined) {
-            windowEnd = this.milliseconds();
-        }
-        if (windowStart === undefined) {
-            windowStart = windowEnd - maxSpan;
-        }
-        let cursor = windowStart;
-        while (cursor < windowEnd) {
-            let chunkEnd = cursor + maxSpan;
-            if (chunkEnd > windowEnd) {
-                chunkEnd = windowEnd;
-            }
-            const request = {
-                'symbol': this.tapiV2Symbol(market),
-                'startTime': cursor,
-                'endTime': chunkEnd,
-            };
             if (requestLimit !== undefined) {
                 request['limit'] = requestLimit;
             }
@@ -2287,13 +2289,9 @@ export default class indodax extends Exchange {
                 response = await this.v2GetMyTrades(this.extend(request, params));
             }
             const rows = this.safeList(response, 'data', []);
-            for (let i = 0; i < rows.length; i++) {
-                result.push(rows[i]);
+            for (let j = 0; j < rows.length; j++) {
+                result.push(rows[j]);
             }
-            if (chunkEnd === cursor) {
-                break;
-            }
-            cursor = chunkEnd;
         }
         return result;
     }
@@ -2307,6 +2305,7 @@ export default class indodax extends Exchange {
      * @param {int} [limit] the maximum number of order structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch orders for
+     * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
      * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
      */
     async fetchOrders(symbol = undefined, since = undefined, limit = undefined, params = {}) {
@@ -2332,6 +2331,7 @@ export default class indodax extends Exchange {
      * @param {int} [limit] the maximum number of trades structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch trades for
+     * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
      * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
      */
     async fetchMyTrades(symbol = undefined, since = undefined, limit = undefined, params = {}) {
@@ -2442,35 +2442,6 @@ export default class indodax extends Exchange {
     /**
      * @ignore
      * @method
-     * @name indodax#v2CurrencyCodes
-     * @param {string[]} [codes] unified currency codes
-     * @returns {string[]} codes to query
-     */
-    v2CurrencyCodes(codes = undefined) {
-        if (codes !== undefined) {
-            return codes;
-        }
-        const seen = {};
-        const result = [];
-        const marketList = this.toArray(this.markets);
-        for (let i = 0; i < marketList.length; i++) {
-            const market = marketList[i];
-            const base = this.safeString(market, 'base');
-            const quote = this.safeString(market, 'quote');
-            if ((base !== undefined) && !(base in seen)) {
-                seen[base] = true;
-                result.push(base);
-            }
-            if ((quote !== undefined) && !(quote in seen)) {
-                seen[quote] = true;
-                result.push(quote);
-            }
-        }
-        return result;
-    }
-    /**
-     * @ignore
-     * @method
      * @name indodax#depositAddressesV2
      * @param {string[]} codes unified currency codes, required because each TAPI v2 query needs a coin
      * @param {object} [params] extra parameters
@@ -2489,10 +2460,9 @@ export default class indodax extends Exchange {
         }
         let networkCode = undefined;
         [networkCode, params] = this.handleNetworkCodeAndParams(params);
-        const currencyCodes = this.v2CurrencyCodes(codes);
         const result = [];
-        for (let i = 0; i < currencyCodes.length; i++) {
-            const code = currencyCodes[i];
+        for (let i = 0; i < numCodes; i++) {
+            const code = codes[i];
             const currency = this.currency(code);
             const coinId = this.safeString(currency, 'id', code);
             if ((coinId === undefined) || (coinId === '')) {
@@ -2507,24 +2477,24 @@ export default class indodax extends Exchange {
             const response = await this.v2GetCapitalDepositAddressList(this.extend(request, params));
             const rows = this.toArray(response);
             const numRows = rows.length;
-            if (numRows < 1) {
-                continue;
-            }
-            const row = rows[0];
-            const address = this.safeString(row, 'address');
-            if (address !== undefined) {
+            for (let j = 0; j < numRows; j++) {
+                const row = rows[j];
+                const address = this.safeString(row, 'address');
+                if ((address === undefined) || (address === '')) {
+                    continue;
+                }
                 this.checkAddress(address);
-            }
-            const networkId = this.safeString(row, 'network');
-            const currencyCode = this.safeString(currency, 'code');
-            if (currencyCode !== undefined) {
-                result.push({
-                    'info': row,
-                    'currency': currencyCode,
-                    'network': this.networkIdToCode(networkId, currencyCode),
-                    'address': address,
-                    'tag': this.safeString(row, 'tag'),
-                });
+                const networkId = this.safeString(row, 'network');
+                const currencyCode = this.safeString(currency, 'code');
+                if (currencyCode !== undefined) {
+                    result.push({
+                        'info': row,
+                        'currency': currencyCode,
+                        'network': this.networkIdToCode(networkId, currencyCode),
+                        'address': address,
+                        'tag': this.safeString(row, 'tag'),
+                    });
+                }
             }
         }
         return result;
@@ -2578,12 +2548,17 @@ export default class indodax extends Exchange {
      * @returns {object[]} raw rows
      */
     async capitalHistoryV2(direction, code = undefined, since = undefined, until = undefined, limit = undefined, params = {}) {
-        params = this.omit(params, ['coin', 'startTime', 'endTime', 'limit']);
+        const paginate = this.safeBool(params, 'paginate', false);
+        params = this.omit(params, ['coin', 'startTime', 'endTime', 'limit', 'paginate']);
         const requestLimit = this.clampV2Limit(limit);
         const maxSpan = 90 * 24 * 60 * 60 * 1000;
         const windows = this.windowV2(since, until, maxSpan);
+        const numWindows = windows.length;
+        if ((numWindows > 1) && (paginate !== true)) {
+            throw new BadRequest(this.id + ' ' + direction + ' history range exceeds 90 days, pass params.paginate true to request each window');
+        }
         const result = [];
-        for (let i = 0; i < windows.length; i++) {
+        for (let i = 0; i < numWindows; i++) {
             const window = windows[i];
             const request = {};
             if (code !== undefined) {
@@ -2608,8 +2583,10 @@ export default class indodax extends Exchange {
             }
             const rows = this.toArray(response);
             for (let j = 0; j < rows.length; j++) {
-                const row = rows[j];
-                row['txType'] = (direction === 'deposit') ? 'deposit' : 'withdraw';
+                const txType = (direction === 'deposit') ? 'deposit' : 'withdraw';
+                const row = this.extend(rows[j], {
+                    'txType': txType,
+                });
                 result.push(row);
             }
         }
@@ -2631,12 +2608,17 @@ export default class indodax extends Exchange {
         if ((code !== undefined) && (code !== 'IDR')) {
             return [];
         }
-        params = this.omit(params, ['transactionType', 'beginTime', 'endTime', 'limit']);
+        const paginate = this.safeBool(params, 'paginate', false);
+        params = this.omit(params, ['transactionType', 'beginTime', 'endTime', 'limit', 'paginate']);
         const requestLimit = this.clampV2Limit(limit);
         const maxSpan = 30 * 24 * 60 * 60 * 1000;
         const windows = this.windowV2(since, until, maxSpan);
+        const numWindows = windows.length;
+        if ((numWindows > 1) && (paginate !== true)) {
+            throw new BadRequest(this.id + ' ' + direction + ' fiat history range exceeds 30 days, pass params.paginate true to request each window');
+        }
         const result = [];
-        for (let i = 0; i < windows.length; i++) {
+        for (let i = 0; i < numWindows; i++) {
             const window = windows[i];
             const request = {};
             if (direction === 'deposit') {
@@ -2654,8 +2636,10 @@ export default class indodax extends Exchange {
             const response = await this.v2GetFiatOrders(this.extend(request, params));
             const rows = this.safeList(response, 'data', []);
             for (let j = 0; j < rows.length; j++) {
-                const row = rows[j];
-                row['txType'] = (direction === 'deposit') ? 'deposit' : 'withdraw';
+                const txType = (direction === 'deposit') ? 'deposit' : 'withdraw';
+                const row = this.extend(rows[j], {
+                    'txType': txType,
+                });
                 result.push(row);
             }
         }
@@ -2667,11 +2651,12 @@ export default class indodax extends Exchange {
      * @description fetch all deposits made to an account
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
-     * @param {string} [code] unified currency code
+     * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
      * @param {int} [since] the earliest time in ms to fetch deposits for
      * @param {int} [limit] the maximum number of deposits structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch deposits for
+     * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
      * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     async fetchDeposits(code = undefined, since = undefined, limit = undefined, params = {}) {
@@ -2701,11 +2686,12 @@ export default class indodax extends Exchange {
      * @description fetch all withdrawals made from an account
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
-     * @param {string} [code] unified currency code
+     * @param {string} [code] unified currency code. Omitting code returns only BTC crypto withdrawals plus IDR fiat withdrawals, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
      * @param {int} [since] the earliest time in ms to fetch withdrawals for
      * @param {int} [limit] the maximum number of withdrawals structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch withdrawals for
+     * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
      * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     async fetchWithdrawals(code = undefined, since = undefined, limit = undefined, params = {}) {
@@ -2746,13 +2732,16 @@ export default class indodax extends Exchange {
         const status = this.safeStringN(transaction, ['withdrawStatus', 'depositStatus', 'status']);
         let timestamp = this.safeInteger2(transaction, 'createTime', 'updateTime');
         if (timestamp === undefined) {
-            const timeString = this.safeStringN(transaction, ['applyTime', 'insertTime', 'completeTime']);
-            timestamp = this.parse8601(timeString);
+            timestamp = this.safeIntegerN(transaction, ['applyTime', 'insertTime', 'completeTime']);
         }
-        let updated = this.safeInteger(transaction, 'updateTime');
+        if (timestamp === undefined) {
+            timestamp = this.parse8601(this.safeStringN(transaction, ['applyTime', 'insertTime', 'completeTime']));
+        }
+        let updated = this.safeInteger2(transaction, 'updateTime', 'completeTime');
         if (updated === undefined) {
             updated = this.parse8601(this.safeString(transaction, 'completeTime'));
         }
+        const info = this.omit(transaction, ['txType']);
         const feeCost = this.safeNumber2(transaction, 'transactionFee', 'totalFee');
         let fee = undefined;
         if (feeCost !== undefined) {
@@ -2783,7 +2772,7 @@ export default class indodax extends Exchange {
             'comment': undefined,
             'internal': undefined,
             'fee': fee,
-            'info': transaction,
+            'info': info,
         };
     }
     /**
@@ -2793,7 +2782,7 @@ export default class indodax extends Exchange {
      * @param {string} code unified currency code
      * @param {float} amount amount to withdraw
      * @param {string} address destination address or bank account number
-     * @param {string} [tag] unused on TAPI v2
+     * @param {string} [tag] destination tag or memo, sent as addressTag
      * @param {object} [params] extra parameters
      * @returns {object} a transaction structure
      */
@@ -2805,14 +2794,15 @@ export default class indodax extends Exchange {
         const currency = this.currency(code);
         if (currency['code'] === 'IDR') {
             const bankCode = this.safeString(params, 'bankCode');
+            if ((bankCode === undefined) || (bankCode === '')) {
+                throw new ArgumentsRequired(this.id + ' withdraw() requires a params.bankCode for IDR, the 3-digit bank code');
+            }
             const clientRequestId = this.safeString(params, 'clientOrderId', this.milliseconds().toString());
             params = this.omit(params, ['bankCode', 'clientOrderId']);
             const accountInfo = {
                 'accountNumber': address,
+                'bankCodeForPix': bankCode,
             };
-            if (bankCode !== undefined) {
-                accountInfo['bankCodeForPix'] = bankCode;
-            }
             const fiatRequest = {
                 'apiPaymentMethod': 'bank_transfer',
                 'currency': 'idr',
@@ -2845,9 +2835,14 @@ export default class indodax extends Exchange {
         if (networkCode !== undefined) {
             request['network'] = this.networkCodeToId(networkCode, currency['code']);
         }
+        if ((tag !== undefined) && (tag !== '')) {
+            request['addressTag'] = tag;
+        }
         const response = await this.v2PostCapitalWithdrawApply(this.extend(request, params));
-        response['txType'] = 'withdraw';
-        return this.parseV2Transaction(response, currency);
+        const annotated = this.extend(response, {
+            'txType': 'withdraw',
+        });
+        return this.parseV2Transaction(annotated, currency);
     }
     /**
      * @ignore
@@ -2885,6 +2880,7 @@ export default class indodax extends Exchange {
             }, params));
             const signature = this.hmac(this.encode(query), this.encode(this.secret), sha256);
             headers = {
+                'Accept': 'application/json',
                 'X-APIKEY': this.apiKey,
                 'Sign': signature,
             };
@@ -2934,8 +2930,8 @@ export default class indodax extends Exchange {
             if ((api === 'public') || adjusted || !(e instanceof InvalidNonce)) {
                 throw e;
             }
-            this.options['timestampAdjusted'] = true;
             await this.loadTimeDifference();
+            this.options['timestampAdjusted'] = true;
             return await this.fetch2(path, api, method, params, headers, body, config);
         }
     }
@@ -2951,21 +2947,10 @@ export default class indodax extends Exchange {
             return undefined; // public endpoints may return []-arrays
         }
         const errorCode = this.safeInteger(response, 'code');
-        if ((errorCode !== undefined) && (errorCode < 0)) {
+        if ((errorCode !== undefined) && (errorCode !== 0)) {
             const message = this.safeString(response, 'msg', '');
             const errorFeedback = this.id + ' ' + body;
-            if (errorCode === -2010) {
-                if (message.indexOf('alance') >= 0) {
-                    throw new InsufficientFunds(errorFeedback);
-                }
-                throw new InvalidOrder(errorFeedback);
-            }
-            if (errorCode === -1016) {
-                if (message.indexOf('aintenance') >= 0) {
-                    throw new OnMaintenance(errorFeedback);
-                }
-                throw new BadSymbol(errorFeedback);
-            }
+            this.throwBroadlyMatchedException(this.exceptions['broad'], message, errorFeedback);
             const codeString = this.numberToString(errorCode);
             this.throwExactlyMatchedException(this.exceptions['exact'], codeString, errorFeedback);
             throw new ExchangeError(errorFeedback);
