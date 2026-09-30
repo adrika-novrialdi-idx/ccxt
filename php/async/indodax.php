@@ -9,7 +9,6 @@ use Exception; // a common import
 use ccxt\async\abstract\indodax as Exchange;
 use ccxt\ExchangeError;
 use ccxt\ArgumentsRequired;
-use ccxt\BadRequest;
 use ccxt\InvalidAddress;
 use ccxt\InvalidOrder;
 use ccxt\NotSupported;
@@ -262,7 +261,7 @@ class indodax extends Exchange {
                 'broad' => array(
                     'Minimum price' => '\\ccxt\\InvalidOrder',
                     'Minimum order' => '\\ccxt\\InvalidOrder',
-                    'alance' => '\\ccxt\\InsufficientFunds',
+                    'nsufficient balance' => '\\ccxt\\InsufficientFunds',
                 ),
             ),
             'timeframes' => array(
@@ -2376,7 +2375,7 @@ class indodax extends Exchange {
         $windows = $this->window_v2($since, $until, $maxSpan);
         $numWindows = count($windows);
         if (($numWindows > 1) && ($paginate !== true)) {
-            throw new BadRequest($this->id . ' ' . $historyKind . ' history range exceeds 7 days, pass $params->paginate true to $request each window');
+            $numWindows = 1;
         }
         $requestLimit = $this->clamp_v2_limit($limit);
         $result = array();
@@ -2423,7 +2422,7 @@ class indodax extends Exchange {
          * @param {int} [$limit] the maximum number of order structures to retrieve
          * @param {array} [$params] extra parameters specific to the exchange API endpoint
          * @param {int} [$params->until] the latest time in ms to fetch orders for
-         * @param {boolean} [$params->paginate] true to request every 7-day window when $since and $until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+         * @param {boolean} [$params->paginate] true to request every 7-day window. When omitted, only the first window from $since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
          * @return {Order[]} a list of ~@link https://docs.ccxt.com/?id=order-structure order structures~
          */
         if (!$this->is_tapi_v2()) {
@@ -2454,7 +2453,7 @@ class indodax extends Exchange {
          * @param {int} [$limit] the maximum number of trades structures to retrieve
          * @param {array} [$params] extra parameters specific to the exchange API endpoint
          * @param {int} [$params->until] the latest time in ms to fetch trades for
-         * @param {boolean} [$params->paginate] true to request every 7-day window when $since and $until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+         * @param {boolean} [$params->paginate] true to request every 7-day window. When omitted, only the first window from $since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
          * @return {Trade[]} a list of ~@link https://docs.ccxt.com/?id=trade-structure trade structures~
          */
         if (!$this->is_tapi_v2()) {
@@ -2684,7 +2683,7 @@ class indodax extends Exchange {
         $windows = $this->window_v2($since, $until, $maxSpan);
         $numWindows = count($windows);
         if (($numWindows > 1) && ($paginate !== true)) {
-            throw new BadRequest($this->id . ' ' . $direction . ' history range exceeds 90 days, pass $params->paginate true to $request each window');
+            $numWindows = 1;
         }
         $result = array();
         for ($i = 0; $i < $numWindows; $i++) {
@@ -2746,7 +2745,7 @@ class indodax extends Exchange {
         $windows = $this->window_v2($since, $until, $maxSpan);
         $numWindows = count($windows);
         if (($numWindows > 1) && ($paginate !== true)) {
-            throw new BadRequest($this->id . ' ' . $direction . ' fiat history range exceeds 30 days, pass $params->paginate true to $request each window');
+            $numWindows = 1;
         }
         $result = array();
         for ($i = 0; $i < $numWindows; $i++) {
@@ -2793,7 +2792,7 @@ class indodax extends Exchange {
          * @param {int} [$limit] the maximum number of deposits structures to retrieve
          * @param {array} [$params] extra parameters specific to the exchange API endpoint
          * @param {int} [$params->until] the latest time in ms to fetch deposits for
-         * @param {boolean} [$params->paginate] true to request every exchange window when $since and $until exceed 90 days for crypto or 30 days for IDR
+         * @param {boolean} [$params->paginate] true to request every exchange window. When omitted, only the first window from $since is requested. Crypto windows are 90 days and IDR windows are 30 days
          * @return {array[]} a list of ~@link https://docs.ccxt.com/?id=transaction-structure transaction structures~
          */
         if (!$this->is_tapi_v2()) {
@@ -2833,7 +2832,7 @@ class indodax extends Exchange {
          * @param {int} [$limit] the maximum number of withdrawals structures to retrieve
          * @param {array} [$params] extra parameters specific to the exchange API endpoint
          * @param {int} [$params->until] the latest time in ms to fetch withdrawals for
-         * @param {boolean} [$params->paginate] true to request every exchange window when $since and $until exceed 90 days for crypto or 30 days for IDR
+         * @param {boolean} [$params->paginate] true to request every exchange window. When omitted, only the first window from $since is requested. Crypto windows are 90 days and IDR windows are 30 days
          * @return {array[]} a list of ~@link https://docs.ccxt.com/?id=transaction-structure transaction structures~
          */
         if (!$this->is_tapi_v2()) {

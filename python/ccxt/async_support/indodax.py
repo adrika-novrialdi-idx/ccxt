@@ -269,7 +269,7 @@ class indodax(Exchange, ImplicitAPI):
                 'broad': {
                     'Minimum price': InvalidOrder,
                     'Minimum order': InvalidOrder,
-                    'alance': InsufficientFunds,
+                    'nsufficient balance': InsufficientFunds,
                 },
             },
             'timeframes': {
@@ -2113,7 +2113,7 @@ class indodax(Exchange, ImplicitAPI):
         windows = self.window_v2(since, until, maxSpan)
         numWindows = len(windows)
         if (numWindows > 1) and (paginate is not True):
-            raise BadRequest(self.id + ' ' + historyKind + ' history range exceeds 7 days, pass params.paginate True to request each window')
+            numWindows = 1
         requestLimit = self.clamp_v2_limit(limit)
         result = []
         for i in range(0, numWindows):
@@ -2148,7 +2148,7 @@ class indodax(Exchange, ImplicitAPI):
         :param int [limit]: the maximum number of order structures to retrieve
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :param int [params.until]: the latest time in ms to fetch orders for
-        :param boolean [params.paginate]: True to request every 7-day window when since and until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so self method requires options.tapiVersion "2"
+        :param boolean [params.paginate]: True to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so self method requires options.tapiVersion "2"
         :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
         """
         if not self.is_tapi_v2():
@@ -2172,7 +2172,7 @@ class indodax(Exchange, ImplicitAPI):
         :param int [limit]: the maximum number of trades structures to retrieve
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :param int [params.until]: the latest time in ms to fetch trades for
-        :param boolean [params.paginate]: True to request every 7-day window when since and until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so self method requires options.tapiVersion "2"
+        :param boolean [params.paginate]: True to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so self method requires options.tapiVersion "2"
         :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=trade-structure>`
         """
         if not self.is_tapi_v2():
@@ -2353,7 +2353,7 @@ class indodax(Exchange, ImplicitAPI):
         windows = self.window_v2(since, until, maxSpan)
         numWindows = len(windows)
         if (numWindows > 1) and (paginate is not True):
-            raise BadRequest(self.id + ' ' + direction + ' history range exceeds 90 days, pass params.paginate True to request each window')
+            numWindows = 1
         result = []
         for i in range(0, numWindows):
             window = windows[i]
@@ -2401,7 +2401,7 @@ class indodax(Exchange, ImplicitAPI):
         windows = self.window_v2(since, until, maxSpan)
         numWindows = len(windows)
         if (numWindows > 1) and (paginate is not True):
-            raise BadRequest(self.id + ' ' + direction + ' fiat history range exceeds 30 days, pass params.paginate True to request each window')
+            numWindows = 1
         result = []
         for i in range(0, numWindows):
             window = windows[i]
@@ -2436,7 +2436,7 @@ class indodax(Exchange, ImplicitAPI):
         :param int [limit]: the maximum number of deposits structures to retrieve
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :param int [params.until]: the latest time in ms to fetch deposits for
-        :param boolean [params.paginate]: True to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+        :param boolean [params.paginate]: True to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
         :returns dict[]: a list of `transaction structures <https://docs.ccxt.com/?id=transaction-structure>`
         """
         if not self.is_tapi_v2():
@@ -2467,7 +2467,7 @@ class indodax(Exchange, ImplicitAPI):
         :param int [limit]: the maximum number of withdrawals structures to retrieve
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :param int [params.until]: the latest time in ms to fetch withdrawals for
-        :param boolean [params.paginate]: True to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+        :param boolean [params.paginate]: True to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
         :returns dict[]: a list of `transaction structures <https://docs.ccxt.com/?id=transaction-structure>`
         """
         if not self.is_tapi_v2():

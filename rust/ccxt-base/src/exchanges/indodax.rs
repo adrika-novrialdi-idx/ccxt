@@ -581,7 +581,7 @@ impl IndodaxCore {
     let mut m = indexmap::IndexMap::new();
         m.insert("Minimum price".to_string(), Value::Str("InvalidOrder".into()).clone());
         m.insert("Minimum order".to_string(), Value::Str("InvalidOrder".into()).clone());
-        m.insert("alance".to_string(), Value::Str("InsufficientFunds".into()).clone());
+        m.insert("nsufficient balance".to_string(), Value::Str("InsufficientFunds".into()).clone());
     m
 }));
     m
@@ -3061,16 +3061,16 @@ impl IndodaxCore {
         params = self.omit(params.clone(), Value::from(vec![Value::Str("symbol".into()), Value::Str("startTime".into()), Value::Str("endTime".into()), Value::Str("limit".into()), Value::Str("paginate".into())]), &[]);
         let mut maxSpan: Value = (match (&((match (&((match (&((match (&(Value::Int(7)), &(Value::Int(24))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(60))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(60))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(1000))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null });
         let mut windows: Value = self.window_v2(since, until, maxSpan);
-        let mut numWindows: f64 = ((windows.len() as i64) as f64);
-        if (numWindows > ((1i64) as f64)) && (paginate.as_bool() != Some(true)) {
-            panic!("{}", crate::exchange_errors::bad_request(format!("{}{}", Value::Str(format!("{}{}", Value::Str(format!("{}{}", self.id.clone(), Value::Str(" ".into())).into()), historyKind).into()), Value::Str(" history range exceeds 7 days, pass params.paginate true to request each window".into()))));
+        let mut numWindows: Value = Value::Int(windows.len() as i64);
+        if (numWindows.as_f64().unwrap_or(f64::NAN) > ((1i64) as f64)) && (paginate.as_bool() != Some(true)) {
+            numWindows = Value::Int(1);
         }
         let mut requestLimit: Value = self.clamp_v2_limit(&[limit]);
         let mut result: Value = Value::from(vec![]);
         {
                         let mut i: Value = Value::Int(0);
             let mut __for_first_229: bool = true;
-            while { if !__for_first_229 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_229 = false; i.as_f64().unwrap_or(f64::NAN) < numWindows } {
+            while { if !__for_first_229 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_229 = false; i.as_f64().unwrap_or(f64::NAN) < numWindows.as_f64().unwrap_or(f64::NAN) } {
             let mut window: Value = windows.as_array().and_then(|__arr| match &i { Value::Int(__n) => __arr.get(*__n as usize), Value::Str(__s) => __s.parse::<usize>().ok().and_then(|__n| __arr.get(__n)), _ => None }).cloned().unwrap_or(Value::Null);
             let mut request: Value = Value::Map({
                 let mut m = indexmap::IndexMap::new();
@@ -3119,7 +3119,7 @@ impl IndodaxCore {
  * @param {int} [limit] the maximum number of order structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch orders for
- * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
  * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
  */
     pub async fn fetch_orders(&mut self, optional_args: &[Value]) -> Value {
@@ -3155,7 +3155,7 @@ impl IndodaxCore {
  * @param {int} [limit] the maximum number of trades structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch trades for
- * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
  * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
  */
     pub async fn fetch_my_trades(&mut self, optional_args: &[Value]) -> Value {
@@ -3435,15 +3435,15 @@ impl IndodaxCore {
         let mut requestLimit: Value = self.clamp_v2_limit(&[limit]);
         let mut maxSpan: Value = (match (&((match (&((match (&((match (&(Value::Int(90)), &(Value::Int(24))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(60))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(60))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(1000))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null });
         let mut windows: Value = self.window_v2(since, until, maxSpan);
-        let mut numWindows: f64 = ((windows.len() as i64) as f64);
-        if (numWindows > ((1i64) as f64)) && (paginate.as_bool() != Some(true)) {
-            panic!("{}", crate::exchange_errors::bad_request(format!("{}{}", Value::Str(format!("{}{}", Value::Str(format!("{}{}", self.id.clone(), Value::Str(" ".into())).into()), direction).into()), Value::Str(" history range exceeds 90 days, pass params.paginate true to request each window".into()))));
+        let mut numWindows: Value = Value::Int(windows.len() as i64);
+        if (numWindows.as_f64().unwrap_or(f64::NAN) > ((1i64) as f64)) && (paginate.as_bool() != Some(true)) {
+            numWindows = Value::Int(1);
         }
         let mut result: Value = Value::from(vec![]);
         {
                         let mut i: Value = Value::Int(0);
             let mut __for_first_233: bool = true;
-            while { if !__for_first_233 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_233 = false; i.as_f64().unwrap_or(f64::NAN) < numWindows } {
+            while { if !__for_first_233 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_233 = false; i.as_f64().unwrap_or(f64::NAN) < numWindows.as_f64().unwrap_or(f64::NAN) } {
             let mut window: Value = windows.as_array().and_then(|__arr| match &i { Value::Int(__n) => __arr.get(*__n as usize), Value::Str(__s) => __s.parse::<usize>().ok().and_then(|__n| __arr.get(__n)), _ => None }).cloned().unwrap_or(Value::Null);
             let mut request: Value = Value::Map({
                 let mut m = indexmap::IndexMap::new();
@@ -3520,15 +3520,15 @@ impl IndodaxCore {
         let mut requestLimit: Value = self.clamp_v2_limit(&[limit]);
         let mut maxSpan: Value = (match (&((match (&((match (&((match (&(Value::Int(30)), &(Value::Int(24))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(60))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(60))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null })), &(Value::Int(1000))) { (Value::Int(x), Value::Int(y)) => Value::Int(x * y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 * *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x * *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x * y), _ => Value::Null });
         let mut windows: Value = self.window_v2(since, until, maxSpan);
-        let mut numWindows: f64 = ((windows.len() as i64) as f64);
-        if (numWindows > ((1i64) as f64)) && (paginate.as_bool() != Some(true)) {
-            panic!("{}", crate::exchange_errors::bad_request(format!("{}{}", Value::Str(format!("{}{}", Value::Str(format!("{}{}", self.id.clone(), Value::Str(" ".into())).into()), direction).into()), Value::Str(" fiat history range exceeds 30 days, pass params.paginate true to request each window".into()))));
+        let mut numWindows: Value = Value::Int(windows.len() as i64);
+        if (numWindows.as_f64().unwrap_or(f64::NAN) > ((1i64) as f64)) && (paginate.as_bool() != Some(true)) {
+            numWindows = Value::Int(1);
         }
         let mut result: Value = Value::from(vec![]);
         {
                         let mut i: Value = Value::Int(0);
             let mut __for_first_235: bool = true;
-            while { if !__for_first_235 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_235 = false; i.as_f64().unwrap_or(f64::NAN) < numWindows } {
+            while { if !__for_first_235 { i = (match (&(i), &(Value::Int(1))) { (Value::Int(x), Value::Int(y)) => Value::Int(x + y), (Value::Int(x), Value::Float(y)) => Value::Float(*x as f64 + *y), (Value::Float(x), Value::Int(y)) => Value::Float(*x + *y as f64), (Value::Float(x), Value::Float(y)) => Value::Float(x + y), _ => Value::Null }); } __for_first_235 = false; i.as_f64().unwrap_or(f64::NAN) < numWindows.as_f64().unwrap_or(f64::NAN) } {
             let mut window: Value = windows.as_array().and_then(|__arr| match &i { Value::Int(__n) => __arr.get(*__n as usize), Value::Str(__s) => __s.parse::<usize>().ok().and_then(|__n| __arr.get(__n)), _ => None }).cloned().unwrap_or(Value::Null);
             let mut request: Value = Value::Map({
                 let mut m = indexmap::IndexMap::new();
@@ -3580,7 +3580,7 @@ impl IndodaxCore {
  * @param {int} [limit] the maximum number of deposits structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch deposits for
- * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
  * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
  */
     pub async fn fetch_deposits(&mut self, optional_args: &[Value]) -> Value {
@@ -3625,7 +3625,7 @@ impl IndodaxCore {
  * @param {int} [limit] the maximum number of withdrawals structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch withdrawals for
- * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
  * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
  */
     pub async fn fetch_withdrawals(&mut self, optional_args: &[Value]) -> Value {

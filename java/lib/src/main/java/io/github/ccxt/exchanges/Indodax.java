@@ -350,7 +350,7 @@ public class Indodax extends IndodaxApi
                 put( "broad", new HashMap<String, Object>() {{
                     put( "Minimum price", InvalidOrder.class );
                     put( "Minimum order", InvalidOrder.class );
-                    put( "alance", InsufficientFunds.class );
+                    put( "nsufficient balance", InsufficientFunds.class );
                 }} );
             }} );
             put( "timeframes", new HashMap<String, Object>() {{
@@ -2789,7 +2789,7 @@ public class Indodax extends IndodaxApi
             Object numWindows = ((List<?>)windows).size();
             if ((Helpers.isGreaterThan(numWindows, 1)) && (!java.util.Objects.equals(paginate, true)))
             {
-                throw new BadRequest((((this.id + " ") + historyKind) + " history range exceeds 7 days, pass params.paginate true to request each window")) ;
+                numWindows = 1;
             }
             Object requestLimit = this.clampV2Limit(limit);
             List<Object> result = new ArrayList<Object>(Arrays.asList());
@@ -2840,7 +2840,7 @@ public class Indodax extends IndodaxApi
      * @param {int} [limit] the maximum number of order structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch orders for
-     * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+     * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
      * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
      */
     public CompletableFuture<List<Order>> fetchOrders(Object... optionalArgs)
@@ -2879,7 +2879,7 @@ public class Indodax extends IndodaxApi
      * @param {int} [limit] the maximum number of trades structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch trades for
-     * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+     * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
      * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
      */
     public CompletableFuture<List<Trade>> fetchMyTrades(Object... optionalArgs)
@@ -3190,7 +3190,7 @@ public class Indodax extends IndodaxApi
             Object numWindows = ((List<?>)windows).size();
             if ((Helpers.isGreaterThan(numWindows, 1)) && (!java.util.Objects.equals(paginate, true)))
             {
-                throw new BadRequest((((this.id + " ") + direction) + " history range exceeds 90 days, pass params.paginate true to request each window")) ;
+                numWindows = 1;
             }
             List<Object> result = new ArrayList<Object>(Arrays.asList());
             for (var i = 0; Helpers.isLessThan(i, numWindows); i++)
@@ -3271,7 +3271,7 @@ public class Indodax extends IndodaxApi
             Object numWindows = ((List<?>)windows).size();
             if ((Helpers.isGreaterThan(numWindows, 1)) && (!java.util.Objects.equals(paginate, true)))
             {
-                throw new BadRequest((((this.id + " ") + direction) + " fiat history range exceeds 30 days, pass params.paginate true to request each window")) ;
+                numWindows = 1;
             }
             List<Object> result = new ArrayList<Object>(Arrays.asList());
             for (var i = 0; Helpers.isLessThan(i, numWindows); i++)
@@ -3321,7 +3321,7 @@ public class Indodax extends IndodaxApi
      * @param {int} [limit] the maximum number of deposits structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch deposits for
-     * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+     * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
      * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     public CompletableFuture<List<Transaction>> fetchDeposits(Object... optionalArgs)
@@ -3371,7 +3371,7 @@ public class Indodax extends IndodaxApi
      * @param {int} [limit] the maximum number of withdrawals structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch withdrawals for
-     * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+     * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
      * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     public CompletableFuture<List<Transaction>> fetchWithdrawals(Object... optionalArgs)

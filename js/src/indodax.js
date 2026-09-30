@@ -257,7 +257,7 @@ export default class indodax extends Exchange {
                 'broad': {
                     'Minimum price': InvalidOrder,
                     'Minimum order': InvalidOrder,
-                    'alance': InsufficientFunds,
+                    'nsufficient balance': InsufficientFunds,
                 },
             },
             'timeframes': {
@@ -2261,9 +2261,9 @@ export default class indodax extends Exchange {
         params = this.omit(params, ['symbol', 'startTime', 'endTime', 'limit', 'paginate']);
         const maxSpan = 7 * 24 * 60 * 60 * 1000;
         const windows = this.windowV2(since, until, maxSpan);
-        const numWindows = windows.length;
+        let numWindows = windows.length;
         if ((numWindows > 1) && (paginate !== true)) {
-            throw new BadRequest(this.id + ' ' + historyKind + ' history range exceeds 7 days, pass params.paginate true to request each window');
+            numWindows = 1;
         }
         const requestLimit = this.clampV2Limit(limit);
         const result = [];
@@ -2305,7 +2305,7 @@ export default class indodax extends Exchange {
      * @param {int} [limit] the maximum number of order structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch orders for
-     * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+     * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
      * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
      */
     async fetchOrders(symbol = undefined, since = undefined, limit = undefined, params = {}) {
@@ -2331,7 +2331,7 @@ export default class indodax extends Exchange {
      * @param {int} [limit] the maximum number of trades structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch trades for
-     * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+     * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
      * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
      */
     async fetchMyTrades(symbol = undefined, since = undefined, limit = undefined, params = {}) {
@@ -2553,9 +2553,9 @@ export default class indodax extends Exchange {
         const requestLimit = this.clampV2Limit(limit);
         const maxSpan = 90 * 24 * 60 * 60 * 1000;
         const windows = this.windowV2(since, until, maxSpan);
-        const numWindows = windows.length;
+        let numWindows = windows.length;
         if ((numWindows > 1) && (paginate !== true)) {
-            throw new BadRequest(this.id + ' ' + direction + ' history range exceeds 90 days, pass params.paginate true to request each window');
+            numWindows = 1;
         }
         const result = [];
         for (let i = 0; i < numWindows; i++) {
@@ -2613,9 +2613,9 @@ export default class indodax extends Exchange {
         const requestLimit = this.clampV2Limit(limit);
         const maxSpan = 30 * 24 * 60 * 60 * 1000;
         const windows = this.windowV2(since, until, maxSpan);
-        const numWindows = windows.length;
+        let numWindows = windows.length;
         if ((numWindows > 1) && (paginate !== true)) {
-            throw new BadRequest(this.id + ' ' + direction + ' fiat history range exceeds 30 days, pass params.paginate true to request each window');
+            numWindows = 1;
         }
         const result = [];
         for (let i = 0; i < numWindows; i++) {
@@ -2656,7 +2656,7 @@ export default class indodax extends Exchange {
      * @param {int} [limit] the maximum number of deposits structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch deposits for
-     * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+     * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
      * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     async fetchDeposits(code = undefined, since = undefined, limit = undefined, params = {}) {
@@ -2691,7 +2691,7 @@ export default class indodax extends Exchange {
      * @param {int} [limit] the maximum number of withdrawals structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch withdrawals for
-     * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+     * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
      * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     async fetchWithdrawals(code = undefined, since = undefined, limit = undefined, params = {}) {

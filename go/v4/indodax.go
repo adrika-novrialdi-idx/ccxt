@@ -327,9 +327,9 @@ func (this *Indodax) Describe() any {
 				"-4019":                                                      InvalidOrder,
 			},
 			"broad": map[string]any{
-				"Minimum price": InvalidOrder,
-				"Minimum order": InvalidOrder,
-				"alance":        InsufficientFunds,
+				"Minimum price":       InvalidOrder,
+				"Minimum order":       InvalidOrder,
+				"nsufficient balance": InsufficientFunds,
 			},
 		},
 		"timeframes": map[string]any{
@@ -2897,7 +2897,7 @@ func (this *Indodax) historyV2Body(ch chan any, historyKind any, symbol any, opt
 	var windows any = this.WindowV2(since, until, maxSpan)
 	var numWindows int = GetArrayLength(windows)
 	if (numWindows > 1) && (paginate == nil || *paginate != true) {
-		panic(BadRequest(Add(Add(this.Id+" ", historyKind), " history range exceeds 7 days, pass params.paginate true to request each window")))
+		numWindows = 1
 	}
 	var requestLimit any = this.ClampV2Limit(limit)
 	var result []any = []any{}
@@ -2950,7 +2950,7 @@ func (this *Indodax) historyV2Body(ch chan any, historyKind any, symbol any, opt
  * @param {int} [limit] the maximum number of order structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch orders for
- * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
  * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
  */
 func (this *Indodax) FetchOrdersAsync(optionalArgs ...any) <-chan any {
@@ -2996,7 +2996,7 @@ func (this *Indodax) fetchOrdersBody(ch chan any, optionalArgs ...any) any {
  * @param {int} [limit] the maximum number of trades structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch trades for
- * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
  * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
  */
 func (this *Indodax) FetchMyTradesAsync(optionalArgs ...any) <-chan any {
@@ -3315,7 +3315,7 @@ func (this *Indodax) capitalHistoryV2Body(ch chan any, direction any, optionalAr
 	var windows any = this.WindowV2(since, until, maxSpan)
 	var numWindows int = GetArrayLength(windows)
 	if (numWindows > 1) && (paginate == nil || *paginate != true) {
-		panic(BadRequest(Add(Add(this.Id+" ", direction), " history range exceeds 90 days, pass params.paginate true to request each window")))
+		numWindows = 1
 	}
 	var result []any = []any{}
 	for i := 0; i < numWindows; i++ {
@@ -3410,7 +3410,7 @@ func (this *Indodax) fiatHistoryV2Body(ch chan any, direction any, optionalArgs 
 	var windows any = this.WindowV2(since, until, maxSpan)
 	var numWindows int = GetArrayLength(windows)
 	if (numWindows > 1) && (paginate == nil || *paginate != true) {
-		panic(BadRequest(Add(Add(this.Id+" ", direction), " fiat history range exceeds 30 days, pass params.paginate true to request each window")))
+		numWindows = 1
 	}
 	var result []any = []any{}
 	for i := 0; i < numWindows; i++ {
@@ -3466,7 +3466,7 @@ func (this *Indodax) fiatHistoryV2Body(ch chan any, direction any, optionalArgs 
  * @param {int} [limit] the maximum number of deposits structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch deposits for
- * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
  * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
  */
 func (this *Indodax) FetchDepositsAsync(optionalArgs ...any) <-chan any {
@@ -3530,7 +3530,7 @@ func (this *Indodax) fetchDepositsBody(ch chan any, optionalArgs ...any) any {
  * @param {int} [limit] the maximum number of withdrawals structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch withdrawals for
- * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
  * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
  */
 func (this *Indodax) FetchWithdrawalsAsync(optionalArgs ...any) <-chan any {
@@ -4509,7 +4509,7 @@ func (this *Indodax) FetchDepositAddresses(options ...FetchDepositAddressesOptio
  * @param {int} [limit] the maximum number of order structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch orders for
- * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
  * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
  */
 func (this *Indodax) FetchOrders(options ...FetchOrdersOptions) ([]Order, error) {
@@ -4536,7 +4536,7 @@ func (this *Indodax) FetchOrders(options ...FetchOrdersOptions) ([]Order, error)
  * @param {int} [limit] the maximum number of trades structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch trades for
- * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
  * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
  */
 func (this *Indodax) FetchMyTrades(options ...FetchMyTradesOptions) ([]Trade, error) {
@@ -4564,7 +4564,7 @@ func (this *Indodax) FetchMyTrades(options ...FetchMyTradesOptions) ([]Trade, er
  * @param {int} [limit] the maximum number of deposits structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch deposits for
- * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
  * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
  */
 func (this *Indodax) FetchDeposits(options ...FetchDepositsOptions) ([]Transaction, error) {
@@ -4592,7 +4592,7 @@ func (this *Indodax) FetchDeposits(options ...FetchDepositsOptions) ([]Transacti
  * @param {int} [limit] the maximum number of withdrawals structures to retrieve
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @param {int} [params.until] the latest time in ms to fetch withdrawals for
- * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
  * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
  */
 func (this *Indodax) FetchWithdrawals(options ...FetchWithdrawalsOptions) ([]Transaction, error) {

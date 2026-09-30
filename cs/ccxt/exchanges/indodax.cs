@@ -319,7 +319,7 @@ public partial class indodax : Exchange
                 { "broad", new Dictionary<string, object>() {
                     { "Minimum price", typeof(InvalidOrder) },
                     { "Minimum order", typeof(InvalidOrder) },
-                    { "alance", typeof(InsufficientFunds) },
+                    { "nsufficient balance", typeof(InsufficientFunds) },
                 } },
             } },
             { "timeframes", new Dictionary<string, object>() {
@@ -2554,7 +2554,7 @@ public partial class indodax : Exchange
         int numWindows = getArrayLength(windows);
         if ((numWindows > 1) && ((paginate != true)))
         {
-            throw new BadRequest ((string)(((this.id + " ") + (historyKind)) + " history range exceeds 7 days, pass params.paginate true to request each window")) ;
+            numWindows = 1;
         }
         object requestLimit = this.clampV2Limit(limit);
         List<object> result = new List<object>() {};
@@ -2603,7 +2603,7 @@ public partial class indodax : Exchange
      * @param {int} [limit] the maximum number of order structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch orders for
-     * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+     * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
      * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
      */
     public async override Task<List<ccxt.Order>> FetchOrders(string symbol = null, Int64? since = null, Int64? limit = null, object parameters = null)
@@ -2634,7 +2634,7 @@ public partial class indodax : Exchange
      * @param {int} [limit] the maximum number of trades structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch trades for
-     * @param {boolean} [params.paginate] true to request every 7-day window when since and until span more than 7 days. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+     * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
      * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
      */
     public async override Task<List<ccxt.Trade>> FetchMyTrades(string symbol = null, Int64? since = null, Int64? limit = null, object parameters = null)
@@ -2905,7 +2905,7 @@ public partial class indodax : Exchange
         int numWindows = getArrayLength(windows);
         if ((numWindows > 1) && ((paginate != true)))
         {
-            throw new BadRequest ((string)(((this.id + " ") + (direction)) + " history range exceeds 90 days, pass params.paginate true to request each window")) ;
+            numWindows = 1;
         }
         List<object> result = new List<object>() {};
         for (int i = 0; i < numWindows; i++)
@@ -2977,7 +2977,7 @@ public partial class indodax : Exchange
         int numWindows = getArrayLength(windows);
         if ((numWindows > 1) && ((paginate != true)))
         {
-            throw new BadRequest ((string)(((this.id + " ") + (direction)) + " fiat history range exceeds 30 days, pass params.paginate true to request each window")) ;
+            numWindows = 1;
         }
         List<object> result = new List<object>() {};
         for (int i = 0; i < numWindows; i++)
@@ -3025,7 +3025,7 @@ public partial class indodax : Exchange
      * @param {int} [limit] the maximum number of deposits structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch deposits for
-     * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+     * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
      * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     public async override Task<List<ccxt.Transaction>> FetchDeposits(string code = null, Int64? since = null, Int64? limit = null, object parameters = null)
@@ -3067,7 +3067,7 @@ public partial class indodax : Exchange
      * @param {int} [limit] the maximum number of withdrawals structures to retrieve
      * @param {object} [params] extra parameters specific to the exchange API endpoint
      * @param {int} [params.until] the latest time in ms to fetch withdrawals for
-     * @param {boolean} [params.paginate] true to request every exchange window when since and until exceed 90 days for crypto or 30 days for IDR
+     * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
      * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
      */
     public async override Task<List<ccxt.Transaction>> FetchWithdrawals(string code = null, Int64? since = null, Int64? limit = null, object parameters = null)
