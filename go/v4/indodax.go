@@ -47,6 +47,8 @@ func (this *Indodax) Describe() any {
 			"createStopLimitOrder":           false,
 			"createStopMarketOrder":          false,
 			"createStopOrder":                false,
+			"editOrder":                      false,
+			"fetchAccounts":                  false,
 			"fetchAllGreeks":                 false,
 			"fetchBalance":                   true,
 			"fetchBorrowInterest":            false,
@@ -63,13 +65,14 @@ func (this *Indodax) Describe() any {
 			"fetchDepositAddress":            "emulated",
 			"fetchDepositAddresses":          true,
 			"fetchDepositAddressesByNetwork": false,
-			"fetchDeposits":                  false,
+			"fetchDeposits":                  true,
 			"fetchDepositsWithdrawals":       true,
 			"fetchDepositWithdrawFee":        true,
 			"fetchDepositWithdrawFees":       false,
 			"fetchFundingHistory":            false,
 			"fetchFundingInterval":           false,
 			"fetchFundingIntervals":          false,
+			"fetchFundingLimits":             false,
 			"fetchFundingRate":               false,
 			"fetchFundingRateHistory":        false,
 			"fetchFundingRates":              false,
@@ -78,6 +81,7 @@ func (this *Indodax) Describe() any {
 			"fetchIsolatedBorrowRate":        false,
 			"fetchIsolatedBorrowRates":       false,
 			"fetchIsolatedPositions":         false,
+			"fetchLedger":                    false,
 			"fetchLeverage":                  false,
 			"fetchLeverages":                 false,
 			"fetchLeverageTiers":             false,
@@ -94,6 +98,7 @@ func (this *Indodax) Describe() any {
 			"fetchMarkPrices":                false,
 			"fetchMyLiquidations":            false,
 			"fetchMySettlementHistory":       false,
+			"fetchMyTrades":                  true,
 			"fetchOHLCV":                     true,
 			"fetchOpenInterest":              false,
 			"fetchOpenInterestHistory":       false,
@@ -103,7 +108,7 @@ func (this *Indodax) Describe() any {
 			"fetchOptionChain":               false,
 			"fetchOrder":                     true,
 			"fetchOrderBook":                 true,
-			"fetchOrders":                    false,
+			"fetchOrders":                    true,
 			"fetchPosition":                  false,
 			"fetchPositionForSymbolWs":       false,
 			"fetchPositionHistory":           false,
@@ -120,7 +125,8 @@ func (this *Indodax) Describe() any {
 			"fetchTime":                      true,
 			"fetchTrades":                    true,
 			"fetchTradingFee":                false,
-			"fetchTradingFees":               false,
+			"fetchTradingFees":               true,
+			"fetchTradingLimits":             true,
 			"fetchTransactionFee":            true,
 			"fetchTransactionFees":           false,
 			"fetchTransactions":              "emulated",
@@ -129,7 +135,7 @@ func (this *Indodax) Describe() any {
 			"fetchUnderlyingAssets":          false,
 			"fetchVolatilityHistory":         false,
 			"fetchWithdrawal":                false,
-			"fetchWithdrawals":               false,
+			"fetchWithdrawals":               true,
 			"reduceMargin":                   false,
 			"repayCrossMargin":               false,
 			"repayIsolatedMargin":            false,
@@ -146,6 +152,7 @@ func (this *Indodax) Describe() any {
 			"api": map[string]any{
 				"public":  "https://indodax.com",
 				"private": "https://indodax.com/tapi",
+				"v2":      "https://api.indodax.com",
 			},
 			"www":      "https://www.indodax.com",
 			"doc":      "https://github.com/btcid/indodax-official-api-docs",
@@ -232,6 +239,53 @@ func (this *Indodax) Describe() any {
 					},
 				},
 			},
+			"v2": map[string]any{
+				"get": map[string]any{
+					"order": map[string]any{
+						"cost": 4,
+					},
+					"openOrders": map[string]any{
+						"cost": 4,
+					},
+					"order/histories": map[string]any{
+						"cost": 4,
+					},
+					"myTrades": map[string]any{
+						"cost": 4,
+					},
+					"account": map[string]any{
+						"cost": 4,
+					},
+					"capital/withdraw/history": map[string]any{
+						"cost": 24,
+					},
+					"capital/deposit/hisrec": map[string]any{
+						"cost": 24,
+					},
+					"capital/deposit/address/list": map[string]any{
+						"cost": 24,
+					},
+					"fiat/orders": map[string]any{
+						"cost": 24,
+					},
+				},
+				"post": map[string]any{
+					"order": map[string]any{
+						"cost": 4,
+					},
+					"capital/withdraw/apply": map[string]any{
+						"cost": 24,
+					},
+					"fiat/withdraw": map[string]any{
+						"cost": 24,
+					},
+				},
+				"delete": map[string]any{
+					"order": map[string]any{
+						"cost": 4,
+					},
+				},
+			},
 		},
 		"fees": map[string]any{
 			"trading": map[string]any{
@@ -248,10 +302,37 @@ func (this *Indodax) Describe() any {
 				"invalid order.":        OrderNotFound,
 				"Invalid credentials. API not found or session has expired.": AuthenticationError,
 				"Invalid credentials. Bad sign.":                             AuthenticationError,
+				"-1121":                                                      BadSymbol,
+				"-2013":                                                      OrderNotFound,
+				"-1021":                                                      InvalidNonce,
+				"invalid_timestamp":                                          InvalidNonce,
+				"-1022":                                                      AuthenticationError,
+				"-1002":                                                      AuthenticationError,
+				"-2014":                                                      AuthenticationError,
+				"-2015":                                                      AuthenticationError,
+				"-1003":                                                      RateLimitExceeded,
+				"-2010":                                                      InvalidOrder,
+				"-4026":                                                      InsufficientFunds,
+				"-1102":                                                      BadRequest,
+				"-1001":                                                      ExchangeNotAvailable,
+				"-1099":                                                      BadRequest,
+				"-1016":                                                      OnMaintenance,
+				"1109":                                                       BadRequest,
+				"1112":                                                       OrderNotFound,
+				"-1130":                                                      InvalidOrder,
+				"-1111":                                                      InvalidOrder,
+				"-4022":                                                      InvalidOrder,
+				"-4023":                                                      InvalidOrder,
+				"-4033":                                                      InvalidAddress,
+				"-4035":                                                      InvalidAddress,
+				"-4039":                                                      BadRequest,
+				"-4060":                                                      InsufficientFunds,
+				"-4019":                                                      InvalidOrder,
 			},
 			"broad": map[string]any{
-				"Minimum price": InvalidOrder,
-				"Minimum order": InvalidOrder,
+				"Minimum price":       InvalidOrder,
+				"Minimum order":       InvalidOrder,
+				"nsufficient balance": InsufficientFunds,
 			},
 		},
 		"timeframes": map[string]any{
@@ -265,6 +346,8 @@ func (this *Indodax) Describe() any {
 			"1w":  "1W",
 		},
 		"options": map[string]any{
+			"tapiVersion":             "1",
+			"sandboxUrl":              nil,
 			"recvWindow":              5 * 1000,
 			"timeDifference":          0,
 			"adjustForTimeDifference": false,
@@ -300,8 +383,14 @@ func (this *Indodax) Describe() any {
 					"marketBuyRequiresPrice": false,
 					"iceberg":                false,
 				},
-				"createOrders":  nil,
-				"fetchMyTrades": nil,
+				"createOrders": nil,
+				"fetchMyTrades": map[string]any{
+					"marginMode":     false,
+					"daysBack":       7,
+					"limit":          1000,
+					"untilDays":      7,
+					"symbolRequired": true,
+				},
 				"fetchOrder": map[string]any{
 					"marginMode":     false,
 					"trigger":        false,
@@ -315,7 +404,15 @@ func (this *Indodax) Describe() any {
 					"trailing":       false,
 					"symbolRequired": false,
 				},
-				"fetchOrders": nil,
+				"fetchOrders": map[string]any{
+					"marginMode":     false,
+					"limit":          1000,
+					"daysBack":       7,
+					"untilDays":      7,
+					"trigger":        false,
+					"trailing":       false,
+					"symbolRequired": true,
+				},
 				"fetchClosedOrders": map[string]any{
 					"marginMode":       false,
 					"limit":            1000,
@@ -354,6 +451,93 @@ func (this *Indodax) Nonce() any {
 }
 
 /**
+ * @ignore
+ * @method
+ * @name indodax#requestTimestamp
+ * @description millisecond timestamp for a signed request, as an integer string
+ * @returns {string} timestamp in milliseconds
+ */
+func (this *Indodax) RequestTimestamp() any {
+	var timeDifference *int64 = this.SafeInteger(this.Options, "timeDifference", 0)
+	return this.NumberToString(this.Milliseconds() - *timeDifference)
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#isTapiV2
+ * @description whether private calls should use TAPI v2
+ * @returns {boolean} true when options.tapiVersion is "2"
+ */
+func (this *Indodax) IsTapiV2() bool {
+	return (*this.SafeString(this.Options, "tapiVersion", "1") == "2")
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#tapiV2Symbol
+ * @description convert a market to the lowercase TAPI v2 symbol
+ * @param {object} market market structure
+ * @returns {string} exchange symbol such as btcidr
+ */
+func (this *Indodax) TapiV2Symbol(market any) string {
+	var marketId *string = this.SafeString(market, "id", "")
+	marketId = SafeStringPtr(strings.Replace(*marketId, "_", "", 1))
+	return strings.ToLower(*marketId)
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#v1PairId
+ * @description TAPI v1 pair id, which is ticker_id rather than the public pair id
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md
+ * @param {object} market unified market
+ * @returns {string} pair id such as btc_idr
+ */
+func (this *Indodax) V1PairId(market any) any {
+	var info map[string]any = SafeMapTyped(market, "info")
+	var tickerId *string = this.SafeString(info, "ticker_id")
+	if tickerId != nil {
+		return tickerId
+	}
+	return this.SafeString(market, "id", "")
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#marketFromV1Pair
+ * @description find a market for a TAPI v1 pair id such as btc_idr
+ * @param {string} pairId pair id from an order or the open-orders map
+ * @returns {object} a market structure
+ */
+func (this *Indodax) MarketFromV1Pair(pairId any) any {
+	if (!IsEqual(pairId, nil)) && (this.Markets_by_id != nil) && (InOp(this.Markets_by_id, pairId)) {
+		return this.SafeMarket(pairId)
+	}
+	var marketList []any = this.ToArray(this.Markets)
+	for i := 0; i < len(marketList); i++ {
+		var entry any = func() any {
+			if i >= 0 && i < len(marketList) {
+				return DerefScalar(marketList[i])
+			}
+			return nil
+		}()
+		var info map[string]any = SafeMapTyped(entry, "info")
+		var tickerId *string = this.SafeString(info, "ticker_id")
+		if (tickerId != nil) && (IsEqual(tickerId, pairId)) {
+			return entry
+		}
+	}
+	if (!IsEqual(pairId, nil)) && (GetIndexOf(pairId, "_") >= 0) {
+		return this.SafeMarket(pairId, nil, "_")
+	}
+	return this.SafeMarket(pairId)
+}
+
+/**
  * @method
  * @name indodax#fetchTime
  * @description fetches the current integer timestamp in milliseconds from the exchange server
@@ -389,10 +573,87 @@ func (this *Indodax) fetchTimeBody(ch chan AsyncResult[*int64], optionalArgs ...
 }
 
 /**
+ * @ignore
+ * @method
+ * @name indodax#pairPriceStep
+ * @description tick size for a public pair
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+ * @param {object} market raw pair from GET /api/pairs
+ * @param {string} [increment] price step from GET /api/price_increments
+ * @returns {string} tick size
+ */
+func (this *Indodax) PairPriceStep(market any, optionalArgs ...any) any {
+	increment := GetArg(optionalArgs, 0, nil)
+	_ = increment
+	if (increment != nil) && (increment != "") {
+		return increment
+	}
+	var pricescale *string = this.SafeString(market, "pricescale")
+	if pricescale != nil {
+		return pricescale
+	}
+	var pricePrecision *string = this.SafeString(market, "price_precision")
+	if pricePrecision != nil {
+		return pricePrecision
+	}
+	return this.ParsePrecision(this.SafeString(market, "price_round"))
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#pairIncrement
+ * @description price step from GET /api/price_increments for one raw pair
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+ * @param {object} market raw pair from GET /api/pairs
+ * @param {object} increments map from GET /api/price_increments
+ * @returns {string|undefined} tick size
+ */
+func (this *Indodax) PairIncrement(market any, increments any) any {
+	var tickerId *string = this.SafeString(market, "ticker_id")
+	var priceStep *string = this.SafeString(increments, tickerId)
+	if priceStep == nil {
+		priceStep = this.SafeString(increments, this.SafeString(market, "id"))
+	}
+	return priceStep
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#parsePublicTradingFee
+ * @description parse the public pair fee, which is not an account fee tier
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @param {object} market raw pair from GET /api/pairs
+ * @returns {object} a trading fee structure, or undefined when the pair has no fee fields
+ */
+func (this *Indodax) ParsePublicTradingFee(market any) any {
+	var takerPercent *string = this.SafeString2(market, "trade_fee_percent_taker", "trade_fee_percent")
+	var makerPercent *string = this.SafeString2(market, "trade_fee_percent_maker", "trade_fee_percent")
+	if (takerPercent == nil) && (makerPercent == nil) {
+		return nil
+	}
+	var baseId *string = this.SafeString(market, "traded_currency")
+	var quoteId *string = this.SafeString(market, "base_currency")
+	var base *string = this.SafeCurrencyCode(baseId)
+	var quote *string = this.SafeCurrencyCode(quoteId)
+	return map[string]any{
+		"info":       market,
+		"symbol":     Add(Add(base, "/"), quote),
+		"percentage": true,
+		"tierBased":  false,
+		"maker":      this.ParseNumber(Precise.StringDiv(makerPercent, "100")),
+		"taker":      this.ParseNumber(Precise.StringDiv(takerPercent, "100")),
+	}
+}
+
+/**
  * @method
  * @name indodax#fetchMarkets
  * @description retrieves data on all markets for indodax
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @returns {object[]} an array of objects representing market data
  */
@@ -407,11 +668,18 @@ func (this *Indodax) fetchMarketsBody(ch chan AsyncResult[any], optionalArgs ...
 	var params map[string]any = GetArgMap(optionalArgs, 0, map[string]any{})
 	_ = params
 
-	listEp403 := <-this.PublicGetApiPairs(params)
-	if listEp403.Err != nil {
-		panic(listEp403.Err)
+	listEp664 := <-this.PublicGetApiPairs(params)
+	if listEp664.Err != nil {
+		panic(listEp664.Err)
 	}
-	var response []any = listEp403.Value
+	var response []any = listEp664.Value
+
+	r := <-this.PublicGetApiPriceIncrements(params)
+	if r.Err != nil {
+		panic(r.Err)
+	}
+	var incrementsResponse map[string]any = r.Value
+	var increments map[string]any = this.SafeDictMap(incrementsResponse, "increments", map[string]any{})
 	//
 	//     [
 	//         {
@@ -426,12 +694,15 @@ func (this *Indodax) fetchMarketsBody(ch chan AsyncResult[any], optionalArgs ...
 	//             "price_precision": 1000,
 	//             "price_round": 8,
 	//             "pricescale": 1000,
+	//             "quantity_increment": "0.00000001",
 	//             "trade_min_base_currency": 10000,
 	//             "trade_min_traded_currency": 0.00007457,
 	//             "has_memo": false,
 	//             "memo_name": false,
 	//             "has_payment_id": false,
 	//             "trade_fee_percent": 0.3,
+	//             "trade_fee_percent_maker": 0.1,
+	//             "trade_fee_percent_taker": 0.2,
 	//             "url_logo": "https://indodax.com/v2/logo/svg/color/btc.svg",
 	//             "url_logo_png": "https://indodax.com/v2/logo/png/color/btc.png",
 	//             "is_maintenance": 0
@@ -457,40 +728,50 @@ func (this *Indodax) fetchMarketsBody(ch chan AsyncResult[any], optionalArgs ...
 		}
 		var isMaintenance *int64 = this.SafeInteger(market, "is_maintenance")
 		var inMaintenance bool = (isMaintenance != nil) && (isMaintenance == nil || *isMaintenance != 0)
+		var active bool = true
+		if inMaintenance {
+			active = false
+		}
+		var fee any = this.ParsePublicTradingFee(market)
+		var taker any = nil
+		var maker any = nil
+		if !IsEqual(fee, nil) {
+			taker = GetValue(fee, "taker")
+			maker = GetValue(fee, "maker")
+		}
+		var amountStep *string = this.SafeString(market, "quantity_increment", "0.00000001")
+		var priceStep any = this.PairIncrement(market, increments)
 		result = append(result, map[string]any{
-			"id":       id,
-			"symbol":   *base + "/" + *quote,
-			"base":     base,
-			"quote":    quote,
-			"settle":   nil,
-			"baseId":   baseId,
-			"quoteId":  quoteId,
-			"settleId": nil,
-			"type":     "spot",
-			"spot":     true,
-			"margin":   false,
-			"swap":     false,
-			"future":   false,
-			"option":   false,
-			"active": func() bool {
-				if inMaintenance {
-					return false
-				}
-				return true
-			}(),
+			"id":             id,
+			"symbol":         *base + "/" + *quote,
+			"base":           base,
+			"quote":          quote,
+			"settle":         nil,
+			"baseId":         baseId,
+			"quoteId":        quoteId,
+			"settleId":       nil,
+			"type":           "spot",
+			"spot":           true,
+			"margin":         false,
+			"swap":           false,
+			"future":         false,
+			"option":         false,
+			"active":         active,
 			"contract":       false,
 			"linear":         nil,
 			"inverse":        nil,
-			"taker":          this.SafeNumber(market, "trade_fee_percent"),
+			"taker":          taker,
+			"maker":          maker,
 			"contractSize":   nil,
 			"expiry":         nil,
 			"expiryDatetime": nil,
 			"strike":         nil,
 			"optionType":     nil,
 			"percentage":     true,
+			"tierBased":      false,
 			"precision": map[string]any{
-				"amount": this.ParseNumber("1e-8"),
-				"price":  this.ParseNumber(this.ParsePrecision(this.SafeString(market, "price_round"))),
+				"amount": this.ParseNumber(amountStep),
+				"price":  this.ParseNumber(this.PairPriceStep(market, priceStep)),
 				"cost":   this.ParseNumber(this.ParsePrecision(this.SafeString(market, "volume_precision"))),
 			},
 			"limits": map[string]any{
@@ -503,11 +784,11 @@ func (this *Indodax) fetchMarketsBody(ch chan AsyncResult[any], optionalArgs ...
 					"max": nil,
 				},
 				"price": map[string]any{
-					"min": this.SafeNumber(market, "trade_min_base_currency"),
+					"min": nil,
 					"max": nil,
 				},
 				"cost": map[string]any{
-					"min": nil,
+					"min": this.SafeNumber(market, "trade_min_base_currency"),
 					"max": nil,
 				},
 			},
@@ -518,6 +799,164 @@ func (this *Indodax) fetchMarketsBody(ch chan AsyncResult[any], optionalArgs ...
 
 	ch <- AsyncResult[any]{Value: result}
 	return nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchTradingFees
+ * @description fetch the public trading fees for multiple markets
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @returns {object} a dictionary of [fee structures]{@link https://docs.ccxt.com/?id=trading-fee-structure} indexed by market symbols
+ */
+func (this *Indodax) FetchTradingFeesAsync(optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.fetchTradingFeesBody(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) fetchTradingFeesBody(ch chan AsyncResult[any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var params map[string]any = GetArgMap(optionalArgs, 0, map[string]any{})
+	_ = params
+
+	listEp808 := <-this.PublicGetApiPairs(params)
+	if listEp808.Err != nil {
+		panic(listEp808.Err)
+	}
+	var response []any = listEp808.Value
+	var rawMarkets []any = this.ToArray(response)
+	var result map[string]any = map[string]any{}
+	for i := 0; i < len(rawMarkets); i++ {
+		var fee any = this.ParsePublicTradingFee(func() any {
+			if i >= 0 && i < len(rawMarkets) {
+				return DerefScalar(rawMarkets[i])
+			}
+			return nil
+		}())
+		if !IsEqual(fee, nil) {
+			var symbol *string = this.SafeString(fee, "symbol")
+			if symbol != nil {
+				AddElementToObject(result, symbol, fee)
+			}
+		}
+	}
+
+	ch <- AsyncResult[any]{Value: result}
+	return nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchTradingLimits
+ * @description fetch the public trading limits and price steps for markets
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+ * @param {string[]|undefined} symbols unified market symbols
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @returns {object} a dictionary of [trading limits structures]{@link https://docs.ccxt.com/?id=trading-limits-structure} indexed by market symbol
+ */
+func (this *Indodax) FetchTradingLimitsAsync(optionalArgs ...any) <-chan EndpointResult[map[string]any] {
+	ch := make(chan EndpointResult[map[string]any], 1)
+	go this.fetchTradingLimitsBody(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) fetchTradingLimitsBody(ch chan EndpointResult[map[string]any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicErrorT(ch)
+	var symbols []string = GetArgStringSlice(optionalArgs, 0, nil)
+	_ = symbols
+	var params map[string]any = GetArgMap(optionalArgs, 1, map[string]any{})
+	_ = params
+
+	listEp853 := <-this.PublicGetApiPairs(params)
+	if listEp853.Err != nil {
+		panic(listEp853.Err)
+	}
+	var response []any = listEp853.Value
+
+	r := <-this.PublicGetApiPriceIncrements(params)
+	if r.Err != nil {
+		panic(r.Err)
+	}
+	var incrementsResponse map[string]any = r.Value
+	var increments map[string]any = this.SafeDictMap(incrementsResponse, "increments", map[string]any{})
+	var rawMarkets []any = this.ToArray(response)
+	var result map[string]any = map[string]any{}
+	for i := 0; i < len(rawMarkets); i++ {
+		var market any = func() any {
+			if i >= 0 && i < len(rawMarkets) {
+				return DerefScalar(rawMarkets[i])
+			}
+			return nil
+		}()
+		var baseId *string = this.SafeString(market, "traded_currency")
+		var quoteId *string = this.SafeString(market, "base_currency")
+		var base *string = this.SafeCurrencyCode(baseId)
+		var quote *string = this.SafeCurrencyCode(quoteId)
+		var symbol any = Add(Add(base, "/"), quote)
+		if symbols != nil {
+			if !this.InArray(symbol, symbols) {
+				continue
+			}
+		}
+		var priceStep any = this.PairIncrement(market, increments)
+		var amountStep *string = this.SafeString(market, "quantity_increment")
+		AddElementToObject(result, symbol, map[string]any{
+			"info": market,
+			"precision": map[string]any{
+				"amount": this.ParseNumber(amountStep),
+				"price":  this.ParseNumber(this.PairPriceStep(market, priceStep)),
+			},
+			"limits": map[string]any{
+				"amount": map[string]any{
+					"min": this.SafeNumber(market, "trade_min_traded_currency"),
+					"max": nil,
+				},
+				"price": map[string]any{
+					"min": nil,
+					"max": nil,
+				},
+				"cost": map[string]any{
+					"min": this.SafeNumber(market, "trade_min_base_currency"),
+					"max": nil,
+				},
+			},
+		})
+	}
+
+	ch <- EndpointResult[map[string]any]{Value: result, Raw: result}
+	return nil
+}
+
+/**
+ * @method
+ * @name indodax#editOrder
+ * @description edit a trade order
+ * @param {string} id order id
+ * @param {string} symbol unified symbol of the market to edit an order in
+ * @param {string} type 'market' or 'limit'
+ * @param {string} side 'buy' or 'sell'
+ * @param {float} [amount] how much of the currency you want to trade in units of the base currency
+ * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+ */
+func (this *Indodax) EditOrderAsync(id string, symbol any, typeVar any, side any, optionalArgs ...any) <-chan AsyncResult[map[string]any] {
+	ch := make(chan AsyncResult[map[string]any], 1)
+	go this.editOrderBody(ch, id, symbol, typeVar, side, optionalArgs...)
+	return ch
+}
+func (this *Indodax) editOrderBody(ch chan AsyncResult[map[string]any], id string, symbol any, typeVar any, side any, optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var amount *float64 = GetArgFloat64Ptr(optionalArgs, 0, nil)
+	_ = amount
+	var price *float64 = GetArgFloat64Ptr(optionalArgs, 1, nil)
+	_ = price
+	var params map[string]any = GetArgMap(optionalArgs, 2, map[string]any{})
+	_ = params
+	panic(NotSupported(this.Id + " editOrder() is not supported yet"))
 }
 func (this *Indodax) ParseBalance(response any) map[string]any {
 	var balances map[string]any = SafeMapTyped(response, "return")
@@ -554,7 +993,9 @@ func (this *Indodax) ParseBalance(response any) map[string]any {
  * @name indodax#fetchBalance
  * @description query for balance and get the amount of funds available for trading or funds locked in orders
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#get-info-endpoint
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-account-information
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {boolean} [params.omitZeroBalances] true to omit zero balances, only used when options.tapiVersion is "2"
  * @returns {object} a [balance structure]{@link https://docs.ccxt.com/?id=balance-structure}
  */
 func (this *Indodax) FetchBalanceAsync(optionalArgs ...any) <-chan AsyncResult[any] {
@@ -567,19 +1008,28 @@ func (this *Indodax) fetchBalanceBody(ch chan AsyncResult[any], optionalArgs ...
 	defer ReturnPanicError(ch)
 	var params map[string]any = GetArgMap(optionalArgs, 0, map[string]any{})
 	_ = params
-	if this.Markets == nil {
+	if this.IsTapiV2() {
 
-		r := <-this.LoadMarketsAsync()
+		r := <-this.BalanceV2Async(params)
 		if r.Err != nil {
 			panic(r.Err)
 		}
+		ch <- AsyncResult[any]{Value: r.Value}
+		return nil
+	}
+	if this.Markets == nil {
+
+		r1 := <-this.LoadMarketsAsync()
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
 	}
 
-	r1 := <-this.PrivatePostGetInfo(params)
-	if r1.Err != nil {
-		panic(r1.Err)
+	r2 := <-this.PrivatePostGetInfo(params)
+	if r2.Err != nil {
+		panic(r2.Err)
 	}
-	var response map[string]any = r1.Value
+	var response map[string]any = r2.Value
 
 	//
 	//     {
@@ -830,8 +1280,12 @@ func (this *Indodax) fetchTickersBody(ch chan AsyncResult[any], optionalArgs ...
 	return nil
 }
 func (this *Indodax) ParseTrade(trade any, optionalArgs ...any) Trade {
+	// copy so Java and Go accept this return; parseV2Trade already built the trade
 	var market map[string]any = GetArgMap(optionalArgs, 0, nil)
 	_ = market
+	if InOp(trade, "tradeId") {
+		return TradeFromMap(this.Extend(this.ParseV2Trade(trade, market), map[string]any{}))
+	}
 	var timestamp *int64 = this.SafeTimestamp(trade, "date")
 	return this.SafeTrade(map[string]any{
 		"id":           this.SafeString(trade, "tid"),
@@ -887,11 +1341,11 @@ func (this *Indodax) fetchTradesBody(ch chan AsyncResult[any], symbol any, optio
 		"pair": market["id"],
 	}
 
-	listEp848 := <-this.PublicGetApiTradesPair(this.Extend(request, params))
-	if listEp848.Err != nil {
-		panic(listEp848.Err)
+	listEp1282 := <-this.PublicGetApiTradesPair(this.Extend(request, params))
+	if listEp1282.Err != nil {
+		panic(listEp1282.Err)
 	}
-	var response []any = listEp848.Value
+	var response []any = listEp1282.Value
 
 	ch <- AsyncResult[any]{Value: this.ParseTrades(response, market, since, limit)}
 	return nil
@@ -970,11 +1424,11 @@ func (this *Indodax) fetchOHLCVBody(ch chan AsyncResult[any], symbol string, opt
 		request["from"] = Subtract(Subtract(now, Multiply(limitResolved, duration)), 1)
 	}
 
-	listEp924 := <-this.PublicGetTradingviewHistoryV2(this.Extend(request, paramsOmitted))
-	if listEp924.Err != nil {
-		panic(listEp924.Err)
+	listEp1358 := <-this.PublicGetTradingviewHistoryV2(this.Extend(request, paramsOmitted))
+	if listEp1358.Err != nil {
+		panic(listEp1358.Err)
 	}
-	var response []any = listEp924.Value
+	var response []any = listEp1358.Value
 
 	//
 	//     [
@@ -993,13 +1447,26 @@ func (this *Indodax) fetchOHLCVBody(ch chan AsyncResult[any], symbol string, opt
 }
 func (this *Indodax) ParseOrderStatus(status *string) *string {
 	var statuses map[string]any = map[string]any{
-		"open":      "open",
-		"filled":    "closed",
-		"cancelled": "canceled",
+		"open":             "open",
+		"filled":           "closed",
+		"cancelled":        "canceled",
+		"NEW":              "open",
+		"PARTIALLY_FILLED": "open",
+		"FILLED":           "closed",
+		"CANCELLED":        "canceled",
+		"CANCELED":         "canceled",
+		"REJECTED":         "rejected",
+		"EXPIRED":          "expired",
 	}
 	return this.SafeString(statuses, status, status)
 }
 func (this *Indodax) ParseOrder(order any, optionalArgs ...any) Order {
+	// copy so Java and Go accept this return; parseV2Order already built the order
+	var market map[string]any = GetArgMap(optionalArgs, 0, nil)
+	_ = market
+	if (InOp(order, "origQty")) || (InOp(order, "oriQty")) || (InOp(order, "fullOrderId")) || (InOp(order, "executedQty")) {
+		return OrderFromMap(this.Extend(this.ParseV2Order(order, market), map[string]any{}))
+	}
 	//
 	//     {
 	//         "order_id": "12345",
@@ -1041,8 +1508,6 @@ func (this *Indodax) ParseOrder(order any, optionalArgs ...any) Order {
 	//        }
 	//    }
 	//
-	var market map[string]any = GetArgMap(optionalArgs, 0, nil)
-	_ = market
 	var side *string = nil
 	if InOp(order, "type") {
 		side = this.SafeString(order, "type")
@@ -1058,20 +1523,40 @@ func (this *Indodax) ParseOrder(order any, optionalArgs ...any) Order {
 	var marketResolved map[string]any = this.SafeMarket(marketId, market)
 	if marketResolved != nil {
 		symbol = marketResolved["symbol"]
-		var quoteId *string = SafeStringPtr(marketResolved["quoteId"])
-		var baseId *string = SafeStringPtr(marketResolved["baseId"])
-		if (marketResolved["quoteId"] == "idr") && (InOp(order, "order_rp")) {
+		var quoteId *string = this.SafeString(marketResolved, "quoteId")
+		var baseId *string = this.SafeString(marketResolved, "baseId")
+		if (quoteId == nil) || (baseId == nil) {
+			var resolved map[string]any = MapTyped(this.MarketFromV1Pair(marketId))
+			var resolvedQuoteId *string = this.SafeString(resolved, "quoteId")
+			var resolvedBaseId *string = this.SafeString(resolved, "baseId")
+			if resolvedQuoteId != nil {
+				quoteId = resolvedQuoteId
+				symbol = DerefScalar(this.SafeString(resolved, "symbol", symbol))
+			}
+			if resolvedBaseId != nil {
+				baseId = resolvedBaseId
+			}
+		}
+		if (quoteId != nil && *quoteId == "idr") && (InOp(order, "order_rp")) {
 			quoteId = SafeStringPtr("rp")
 		}
-		if (marketResolved["baseId"] == "idr") && (InOp(order, "remain_rp")) {
+		if (baseId != nil && *baseId == "idr") && (InOp(order, "remain_rp")) {
 			baseId = SafeStringPtr("rp")
 		}
-		cost = this.SafeString(order, Add("order_", quoteId))
-		amount = this.SafeString(order, Add("order_", baseId))
-		remaining = this.SafeString(order, Add("remain_", baseId))
-		// filled buy orders on idr-quoted markets carry the executed base amount
-		// only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
-		filled = this.SafeString(order, Add("receive_", baseId))
+		if quoteId != nil {
+			var costKey string = "order_" + *quoteId
+			cost = this.SafeString(order, costKey)
+		}
+		if baseId != nil {
+			var amountKey string = "order_" + *baseId
+			var remainKey string = "remain_" + *baseId
+			var filledKey string = "receive_" + *baseId
+			amount = this.SafeString(order, amountKey)
+			remaining = this.SafeString(order, remainKey)
+			// filled buy orders on idr-quoted markets carry the executed base amount
+			// only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
+			filled = this.SafeString(order, filledKey)
+		}
 	}
 	var timestamp *int64 = this.SafeInteger(order, "submit_time")
 	var fee any = nil
@@ -1106,9 +1591,11 @@ func (this *Indodax) ParseOrder(order any, optionalArgs ...any) Order {
  * @name indodax#fetchOrder
  * @description fetches information on an order made by the user
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#get-order-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-order
  * @param {string} id order id
  * @param {string} symbol unified symbol of the market the order was made in
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
  * @returns {object} An [order structure]{@link https://docs.ccxt.com/?id=order-structure}
  */
 func (this *Indodax) FetchOrderAsync(id any, optionalArgs ...any) <-chan AsyncResult[map[string]any] {
@@ -1119,31 +1606,53 @@ func (this *Indodax) FetchOrderAsync(id any, optionalArgs ...any) <-chan AsyncRe
 func (this *Indodax) fetchOrderBody(ch chan AsyncResult[map[string]any], id any, optionalArgs ...any) any {
 	defer close(ch)
 	defer ReturnPanicError(ch)
-	var symbol *string = GetArgStringPtr(optionalArgs, 0, nil)
+	symbol := GetArg(optionalArgs, 0, nil)
 	_ = symbol
 	var params map[string]any = GetArgMap(optionalArgs, 1, map[string]any{})
 	_ = params
+	if this.IsTapiV2() {
+		if this.Markets == nil {
+
+			r := <-this.LoadMarketsAsync()
+			if r.Err != nil {
+				panic(r.Err)
+			}
+		}
+		var orderRequest any = this.V2OrderRequest(id, symbol, params)
+		var v2Market any = GetValue(orderRequest, 0)
+		var v2Request any = GetValue(orderRequest, 1)
+		var paramsRest any = GetValue(orderRequest, 2)
+
+		r1 := <-this.V2GetOrder(this.Extend(v2Request, paramsRest))
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
+		var v2Response map[string]any = r1.Value
+
+		ch <- AsyncResult[map[string]any]{Value: OrderToMap(this.ParseOrder(v2Response, v2Market))}
+		return nil
+	}
 	if symbol == nil {
 		panic(ArgumentsRequired(this.Id + " fetchOrder() requires a symbol argument"))
 	}
 	if this.Markets == nil {
 
-		r := <-this.LoadMarketsAsync()
-		if r.Err != nil {
-			panic(r.Err)
+		r2 := <-this.LoadMarketsAsync()
+		if r2.Err != nil {
+			panic(r2.Err)
 		}
 	}
 	var market map[string]any = this.Market(symbol)
 	var request map[string]any = map[string]any{
-		"pair":     market["id"],
+		"pair":     this.V1PairId(market),
 		"order_id": id,
 	}
 
-	r1 := <-this.PrivatePostGetOrder(this.Extend(request, params))
-	if r1.Err != nil {
-		panic(r1.Err)
+	r3 := <-this.PrivatePostGetOrder(this.Extend(request, params))
+	if r3.Err != nil {
+		panic(r3.Err)
 	}
-	response := r1.Raw
+	response := r3.Raw
 	var orders map[string]any = SafeMapTyped(response, "return")
 	var order map[string]any = OrderToMap(this.ParseOrder(this.Extend(map[string]any{
 		"id": id,
@@ -1159,6 +1668,7 @@ func (this *Indodax) fetchOrderBody(ch chan AsyncResult[map[string]any], id any,
  * @name indodax#fetchOpenOrders
  * @description fetch all unfilled currently open orders
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#open-orders-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#pending-order
  * @param {string} symbol unified market symbol
  * @param {int} [since] the earliest time in ms to fetch open orders for
  * @param {int} [limit] the maximum number of  open orders structures to retrieve
@@ -1181,25 +1691,34 @@ func (this *Indodax) fetchOpenOrdersBody(ch chan AsyncResult[any], optionalArgs 
 	_ = limit
 	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
 	_ = params
-	if this.Markets == nil {
+	if this.IsTapiV2() {
 
-		r := <-this.LoadMarketsAsync()
+		r := <-this.OpenOrdersV2Async(symbol, since, limit, params)
 		if r.Err != nil {
 			panic(r.Err)
 		}
+		ch <- AsyncResult[any]{Value: r.Value}
+		return nil
 	}
-	var market map[string]any = nil
+	if this.Markets == nil {
+
+		r1 := <-this.LoadMarketsAsync()
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
+	}
+	var market any = nil
 	var request map[string]any = map[string]any{}
 	if symbol != nil {
 		market = this.Market(symbol)
-		request["pair"] = market["id"]
+		request["pair"] = this.V1PairId(market)
 	}
 
-	r1 := <-this.PrivatePostOpenOrders(this.Extend(request, params))
-	if r1.Err != nil {
-		panic(r1.Err)
+	r2 := <-this.PrivatePostOpenOrders(this.Extend(request, params))
+	if r2.Err != nil {
+		panic(r2.Err)
 	}
-	var response map[string]any = r1.Value
+	var response map[string]any = r2.Value
 	var openOrdersResult map[string]any = SafeMapTyped(response, "return")
 	var rawOrders any = openOrdersResult["orders"]
 	// { success: 1, return: { orders: null }} if no orders
@@ -1220,7 +1739,7 @@ func (this *Indodax) fetchOpenOrdersBody(ch chan AsyncResult[any], optionalArgs 
 	for i := 0; i < len(marketIds); i++ {
 		var marketId string = marketIds[i]
 		var marketOrders any = GetValue(rawOrders, marketId)
-		market = this.SafeMarket(marketId)
+		market = this.MarketFromV1Pair(marketId)
 		var parsedOrders any = this.ParseOrders(marketOrders, market, since, limit)
 		exchangeOrders = this.ArrayConcat(exchangeOrders, parsedOrders)
 	}
@@ -1234,6 +1753,7 @@ func (this *Indodax) fetchOpenOrdersBody(ch chan AsyncResult[any], optionalArgs 
  * @name indodax#fetchClosedOrders
  * @description fetches information on multiple closed orders made by the user
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#order-history
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#order-history
  * @param {string} symbol unified market symbol of the market orders were made in
  * @param {int} [since] the earliest time in ms to fetch orders for
  * @param {int} [limit] the maximum number of order structures to retrieve
@@ -1256,26 +1776,37 @@ func (this *Indodax) fetchClosedOrdersBody(ch chan AsyncResult[any], optionalArg
 	_ = limit
 	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
 	_ = params
+	if this.IsTapiV2() {
+
+		r := <-this.FetchOrdersAsync(symbol, since, limit, params)
+		if r.Err != nil {
+			panic(r.Err)
+		}
+		var closedOrders []any = ListTyped(r.Value)
+
+		ch <- AsyncResult[any]{Value: this.FilterBy(closedOrders, "status", "closed")}
+		return nil
+	}
 	if symbol == nil {
 		panic(ArgumentsRequired(this.Id + " fetchClosedOrders() requires a symbol argument"))
 	}
 	if this.Markets == nil {
 
-		r := <-this.LoadMarketsAsync()
-		if r.Err != nil {
-			panic(r.Err)
+		r1 := <-this.LoadMarketsAsync()
+		if r1.Err != nil {
+			panic(r1.Err)
 		}
 	}
 	var market map[string]any = this.Market(symbol)
 	var request map[string]any = map[string]any{
-		"pair": market["id"],
+		"pair": this.V1PairId(market),
 	}
 
-	r1 := <-this.PrivatePostOrderHistory(this.Extend(request, params))
-	if r1.Err != nil {
-		panic(r1.Err)
+	r2 := <-this.PrivatePostOrderHistory(this.Extend(request, params))
+	if r2.Err != nil {
+		panic(r2.Err)
 	}
-	var response map[string]any = MapTyped(r1.Raw)
+	var response map[string]any = MapTyped(r2.Raw)
 	var historyResult map[string]any = SafeMapTyped(response, "return")
 	var orders any = this.ParseOrders(historyResult["orders"], market)
 	orders = this.FilterBy(orders, "status", "closed")
@@ -1289,12 +1820,17 @@ func (this *Indodax) fetchClosedOrdersBody(ch chan AsyncResult[any], optionalArg
  * @name indodax#createOrder
  * @description create a trade order
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#trade-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
  * @param {string} symbol unified symbol of the market to create an order in
  * @param {string} type 'market' or 'limit'
  * @param {string} side 'buy' or 'sell'
  * @param {float} amount how much of currency you want to trade in units of base currency
  * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency, ignored in market orders
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {float} [params.cost] quote amount to spend on a market buy, only used when options.tapiVersion is "2"
+ * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
+ * @param {string} [params.timeInForce] GTC or MOC, only used when options.tapiVersion is "2"
+ * @param {string} [params.selfTradePreventionMode] EXPIRE_TAKER, EXPIRE_MAKER, or EXPIRE_BOTH, only used when options.tapiVersion is "2"
  * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
  */
 func (this *Indodax) CreateOrderAsync(symbol string, typeVar string, side string, amount any, optionalArgs ...any) <-chan AsyncResult[map[string]any] {
@@ -1309,26 +1845,88 @@ func (this *Indodax) createOrderBody(ch chan AsyncResult[map[string]any], symbol
 	_ = price
 	var params map[string]any = GetArgMap(optionalArgs, 1, map[string]any{})
 	_ = params
+	if this.IsTapiV2() {
+		if this.Markets == nil {
+
+			r := <-this.LoadMarketsAsync()
+			if r.Err != nil {
+				panic(r.Err)
+			}
+		}
+		var v2Market map[string]any = this.Market(symbol)
+		if false {
+			panic(ArgumentsRequired(this.Id + " createOrder() requires a side argument"))
+		}
+		var clientOrderId *string = this.SafeString(params, "clientOrderId")
+		var timeInForce *string = this.SafeString(params, "timeInForce")
+		var selfTradePreventionMode *string = this.SafeString(params, "selfTradePreventionMode")
+		var cost *string = this.SafeString(params, "cost")
+		var paramsOmitted map[string]any = this.OmitDict(params, []any{"clientOrderId", "timeInForce", "selfTradePreventionMode", "cost"})
+		var v2Request map[string]any = map[string]any{
+			"symbol": this.TapiV2Symbol(v2Market),
+			"side":   strings.ToUpper(side),
+			"type":   strings.ToUpper(typeVar),
+		}
+		if typeVar == "market" {
+			if side == "buy" {
+				var quoteAmount any = nil
+				if cost != nil {
+					quoteAmount = this.CostToPrecision(symbol, cost)
+				} else {
+					if price == nil {
+						panic(InvalidOrder(this.Id + " createOrder() requires the price argument or params.cost for market buy orders"))
+					}
+					var amountString *string = this.NumberToString(amount)
+					var priceString *string = this.NumberToString(price)
+					quoteAmount = this.CostToPrecision(symbol, Precise.StringMul(amountString, priceString))
+				}
+				v2Request["quoteOrderQty"] = quoteAmount
+			} else {
+				v2Request["quantity"] = this.AmountToPrecision(symbol, amount)
+			}
+		} else if typeVar == "limit" {
+			if price == nil {
+				panic(InvalidOrder(this.Id + " createOrder() requires a price argument for a limit order"))
+			}
+			v2Request["price"] = this.PriceToPrecision(symbol, price)
+			v2Request["quantity"] = this.AmountToPrecision(symbol, amount)
+			if timeInForce != nil {
+				v2Request["timeInForce"] = timeInForce
+			}
+		} else {
+			panic(InvalidOrder(this.Id + " createOrder() does not support order type " + typeVar))
+		}
+		if clientOrderId != nil {
+			v2Request["newClientOrderId"] = clientOrderId
+		}
+		if selfTradePreventionMode != nil {
+			v2Request["selfTradePreventionMode"] = selfTradePreventionMode
+		}
+
+		r1 := <-this.V2PostOrder(this.Extend(v2Request, paramsOmitted))
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
+		var v2Response map[string]any = r1.Value
+
+		ch <- AsyncResult[map[string]any]{Value: OrderToMap(this.ParseOrder(v2Response, v2Market))}
+		return nil
+	}
 	if this.Markets == nil {
 
-		r := <-this.LoadMarketsAsync()
-		if r.Err != nil {
-			panic(r.Err)
+		r2 := <-this.LoadMarketsAsync()
+		if r2.Err != nil {
+			panic(r2.Err)
 		}
 	}
 	var market map[string]any = this.Market(symbol)
 	var request map[string]any = map[string]any{
-		"pair":  market["id"],
+		"pair":  this.V1PairId(market),
 		"type":  side,
 		"price": price,
 	}
 	var priceIsRequired bool = false
 	var quantityIsRequired bool = false
-	var isMarketBuy bool = (typeVar == "market") && (side == "buy")
-	var paramsOmitted any = params
-	if isMarketBuy {
-		paramsOmitted = this.Omit(params, "cost")
-	}
 	if typeVar == "market" {
 		if side == "buy" {
 			var quoteAmount any = nil
@@ -1364,12 +1962,18 @@ func (this *Indodax) createOrderBody(ch chan AsyncResult[map[string]any], symbol
 	if quantityIsRequired {
 		AddElementToObject(request, market["baseId"], this.AmountToPrecision(symbol, amount))
 	}
+	var tradeParams map[string]any = func() map[string]any {
+		if (typeVar == "market") && (side == "buy") {
+			return this.OmitDict(params, "cost")
+		}
+		return params
+	}()
 
-	r1 := <-this.PrivatePostTrade(this.Extend(request, paramsOmitted))
-	if r1.Err != nil {
-		panic(r1.Err)
+	r3 := <-this.PrivatePostTrade(this.Extend(request, tradeParams))
+	if r3.Err != nil {
+		panic(r3.Err)
 	}
-	result := r1.Raw
+	result := r3.Raw
 	var data map[string]any = SafeMapTyped(result, "return")
 	var id *string = this.SafeString(data, "order_id")
 
@@ -1385,9 +1989,12 @@ func (this *Indodax) createOrderBody(ch chan AsyncResult[map[string]any], symbol
  * @name indodax#cancelOrder
  * @description cancels an open order
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#cancel-order-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#cancel-order
  * @param {string} id order id
  * @param {string} symbol unified symbol of the market the order was made in
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.side] order side, required on TAPI v1 and not used when options.tapiVersion is "2"
+ * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
  * @returns {object} An [order structure]{@link https://docs.ccxt.com/?id=order-structure}
  */
 func (this *Indodax) CancelOrderAsync(id any, optionalArgs ...any) <-chan AsyncResult[map[string]any] {
@@ -1398,10 +2005,32 @@ func (this *Indodax) CancelOrderAsync(id any, optionalArgs ...any) <-chan AsyncR
 func (this *Indodax) cancelOrderBody(ch chan AsyncResult[map[string]any], id any, optionalArgs ...any) any {
 	defer close(ch)
 	defer ReturnPanicError(ch)
-	var symbol *string = GetArgStringPtr(optionalArgs, 0, nil)
+	symbol := GetArg(optionalArgs, 0, nil)
 	_ = symbol
 	var params map[string]any = GetArgMap(optionalArgs, 1, map[string]any{})
 	_ = params
+	if this.IsTapiV2() {
+		if this.Markets == nil {
+
+			r := <-this.LoadMarketsAsync()
+			if r.Err != nil {
+				panic(r.Err)
+			}
+		}
+		var orderRequest any = this.V2OrderRequest(id, symbol, params)
+		var v2Market any = GetValue(orderRequest, 0)
+		var v2Request any = GetValue(orderRequest, 1)
+		var paramsRest any = GetValue(orderRequest, 2)
+
+		r1 := <-this.V2DeleteOrder(this.Extend(v2Request, paramsRest))
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
+		var v2Response map[string]any = r1.Value
+
+		ch <- AsyncResult[map[string]any]{Value: OrderToMap(this.ParseOrder(v2Response, v2Market))}
+		return nil
+	}
 	if symbol == nil {
 		panic(ArgumentsRequired(this.Id + " cancelOrder() requires a symbol argument"))
 	}
@@ -1411,23 +2040,23 @@ func (this *Indodax) cancelOrderBody(ch chan AsyncResult[map[string]any], id any
 	}
 	if this.Markets == nil {
 
-		r := <-this.LoadMarketsAsync()
-		if r.Err != nil {
-			panic(r.Err)
+		r2 := <-this.LoadMarketsAsync()
+		if r2.Err != nil {
+			panic(r2.Err)
 		}
 	}
 	var market map[string]any = this.Market(symbol)
 	var request map[string]any = map[string]any{
 		"order_id": id,
-		"pair":     market["id"],
+		"pair":     this.V1PairId(market),
 		"type":     side,
 	}
 
-	r1 := <-this.PrivatePostCancelOrder(this.Extend(request, params))
-	if r1.Err != nil {
-		panic(r1.Err)
+	r3 := <-this.PrivatePostCancelOrder(this.Extend(request, params))
+	if r3.Err != nil {
+		panic(r3.Err)
 	}
-	var response map[string]any = r1.Value
+	var response map[string]any = r3.Value
 	//
 	//    {
 	//        "success": 1,
@@ -1472,6 +2101,9 @@ func (this *Indodax) fetchTransactionFeeBody(ch chan EndpointResult[map[string]a
 	defer ReturnPanicErrorT(ch)
 	var params map[string]any = GetArgMap(optionalArgs, 0, map[string]any{})
 	_ = params
+	if this.IsTapiV2() {
+		panic(NotSupported(this.Id + " fetchTransactionFee() is not available when options.tapiVersion is \"2\""))
+	}
 	if this.Markets == nil {
 
 		r := <-this.LoadMarketsAsync()
@@ -1530,6 +2162,9 @@ func (this *Indodax) fetchDepositWithdrawFeeBody(ch chan AsyncResult[any], code 
 	defer ReturnPanicError(ch)
 	var params map[string]any = GetArgMap(optionalArgs, 0, map[string]any{})
 	_ = params
+	if this.IsTapiV2() {
+		panic(NotSupported(this.Id + " fetchDepositWithdrawFee() is not available when options.tapiVersion is \"2\""))
+	}
 
 	r := <-this.LoadMarketsAsync()
 	if r.Err != nil {
@@ -1571,7 +2206,8 @@ func (this *Indodax) fetchDepositWithdrawFeeBody(ch chan AsyncResult[any], code 
  * @name indodax#fetchDepositsWithdrawals
  * @description fetch history of deposits and withdrawals
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#transaction-history-endpoints
- * @param {string} [code] unified currency code for the currency of the deposit/withdrawals, default is undefined
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
+ * @param {string} [code] unified currency code. On TAPI v2, omitting code returns only BTC crypto history plus IDR fiat history, because the exchange defaults coin to BTC
  * @param {int} [since] timestamp in ms of the earliest deposit/withdrawal, default is undefined
  * @param {int} [limit] max number of deposit/withdrawals to return, default is undefined
  * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -1593,11 +2229,29 @@ func (this *Indodax) fetchDepositsWithdrawalsBody(ch chan AsyncResult[any], opti
 	_ = limit
 	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
 	_ = params
-	if this.Markets == nil {
+	if this.IsTapiV2() {
 
-		r := <-this.LoadMarketsAsync()
+		r := <-this.FetchDepositsAsync(code, since, limit, params)
 		if r.Err != nil {
 			panic(r.Err)
+		}
+		deposits := r.Value
+
+		r1 := <-this.FetchWithdrawalsAsync(code, since, limit, params)
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
+		withdrawals := r1.Value
+		var merged []any = this.ArrayConcat(deposits, withdrawals)
+
+		ch <- AsyncResult[any]{Value: this.FilterBySinceLimit(merged, since, limit, "timestamp")}
+		return nil
+	}
+	if this.Markets == nil {
+
+		r2 := <-this.LoadMarketsAsync()
+		if r2.Err != nil {
+			panic(r2.Err)
 		}
 	}
 	var request map[string]any = map[string]any{}
@@ -1607,11 +2261,11 @@ func (this *Indodax) fetchDepositsWithdrawalsBody(ch chan AsyncResult[any], opti
 		request["end"] = this.Yyyymmdd(this.Milliseconds())
 	}
 
-	r1 := <-this.PrivatePostTransHistory(this.Extend(request, params))
-	if r1.Err != nil {
-		panic(r1.Err)
+	r3 := <-this.PrivatePostTransHistory(this.Extend(request, params))
+	if r3.Err != nil {
+		panic(r3.Err)
 	}
-	var response map[string]any = r1.Value
+	var response map[string]any = r3.Value
 	//
 	//     {
 	//         "success": 1,
@@ -1707,11 +2361,16 @@ func (this *Indodax) fetchDepositsWithdrawalsBody(ch chan AsyncResult[any], opti
  * @name indodax#withdraw
  * @description make a withdrawal
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#withdraw-coin-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#withdraw-coin
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#withdraw-idr
  * @param {string} code unified currency code
  * @param {float} amount the amount to withdraw
  * @param {string} address the address to withdraw to
  * @param {string} tag
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.network] unified network code, used for crypto withdrawals when options.tapiVersion is "2"
+ * @param {string} [params.clientOrderId] client request id, only used when options.tapiVersion is "2"
+ * @param {string} [params.bankCode] bank code for an IDR withdrawal when options.tapiVersion is "2"
  * @returns {object} a [transaction structure]{@link https://docs.ccxt.com/?id=transaction-structure}
  */
 func (this *Indodax) WithdrawAsync(code string, amount any, address any, optionalArgs ...any) <-chan EndpointResult[map[string]any] {
@@ -1726,15 +2385,27 @@ func (this *Indodax) withdrawBody(ch chan EndpointResult[map[string]any], code s
 	_ = tag
 	var params map[string]any = GetArgMap(optionalArgs, 1, map[string]any{})
 	_ = params
-	var tagWithdrawTagparamsWithdrawTagVariable []any = this.HandleWithdrawTagAndParams(tag, params)
-	var tagWithdrawTag *string = SafeStringPtr(tagWithdrawTagparamsWithdrawTagVariable[0])
-	var paramsWithdrawTag map[string]any = MapTyped(tagWithdrawTagparamsWithdrawTagVariable[1])
+	if this.IsTapiV2() {
+
+		r := <-this.SendWithdrawV2Async(code, amount, address, tag, params)
+		if r.Err != nil {
+			panic(r.Err)
+		}
+		withdrawal := r.Value
+
+		chValue := this.Extend(withdrawal, map[string]any{})
+		ch <- EndpointResult[map[string]any]{Value: chValue, Raw: chValue}
+		return nil
+	}
+	var withdrawTag any = this.HandleWithdrawTagAndParams(tag, params)
+	var tagWithdrawTag *string = SafeStringPtr(GetValue(withdrawTag, 0))
+	var paramsWithdrawTag any = GetValue(withdrawTag, 1)
 	this.CheckAddress(address)
 	if this.Markets == nil {
 
-		r := <-this.LoadMarketsAsync()
-		if r.Err != nil {
-			panic(r.Err)
+		r1 := <-this.LoadMarketsAsync()
+		if r1.Err != nil {
+			panic(r1.Err)
 		}
 	}
 	var currency map[string]any = this.Currency(code)
@@ -1755,11 +2426,11 @@ func (this *Indodax) withdrawBody(ch chan EndpointResult[map[string]any], code s
 		request["withdraw_memo"] = tagWithdrawTag
 	}
 
-	r1 := <-this.PrivatePostWithdrawCoin(this.Extend(request, paramsWithdrawTag))
-	if r1.Err != nil {
-		panic(r1.Err)
+	r2 := <-this.PrivatePostWithdrawCoin(this.Extend(request, paramsWithdrawTag))
+	if r2.Err != nil {
+		panic(r2.Err)
 	}
-	var response map[string]any = r1.Value
+	var response map[string]any = r2.Value
 
 	//
 	//     {
@@ -1781,6 +2452,12 @@ func (this *Indodax) withdrawBody(ch chan EndpointResult[map[string]any], code s
 	return nil
 }
 func (this *Indodax) ParseTransaction(transaction any, optionalArgs ...any) map[string]any {
+	// copy so Go accepts this return; parseV2Transaction already built the transaction
+	var currency map[string]any = GetArgMap(optionalArgs, 0, nil)
+	_ = currency
+	if (InOp(transaction, "coin")) || (InOp(transaction, "fiatCurrency")) || (InOp(transaction, "withdrawStatus")) || (InOp(transaction, "depositStatus")) || (InOp(transaction, "txType")) {
+		return this.Extend(this.ParseV2Transaction(transaction, currency), map[string]any{})
+	}
 	//
 	// withdraw
 	//
@@ -1822,8 +2499,6 @@ func (this *Indodax) ParseTransaction(transaction any, optionalArgs ...any) map[
 	//         "deposit_id": "3602369",
 	//         "tx": "c816aeb35a5b42f389970325a32aff69bb6b2126784dcda8f23b9dd9570d6573"
 	//     },
-	var currency map[string]any = GetArgMap(optionalArgs, 0, nil)
-	_ = currency
 	var status *string = this.SafeString(transaction, "status")
 	var timestamp *int64 = this.SafeTimestamp2(transaction, "success_time", "submit_time")
 	var depositId *string = this.SafeString(transaction, "deposit_id")
@@ -1867,8 +2542,108 @@ func (this *Indodax) ParseTransaction(transaction any, optionalArgs ...any) map[
 func (this *Indodax) ParseTransactionStatus(status *string) *string {
 	var statuses map[string]any = map[string]any{
 		"success": "ok",
+		"pending": "pending",
+		"failed":  "failed",
 	}
 	return this.SafeString(statuses, status, status)
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#v1DepositNetwork
+ * @description parse a getInfo network value, which may be a string, a comma-separated string, a list, or empty
+ * @param {object} networks network map from getInfo
+ * @param {string} currencyId currency id key
+ * @param {string} code unified currency code
+ * @returns {string[]} unified network codes, one per network
+ */
+func (this *Indodax) V1DepositNetwork(networks any, currencyId string, code any) any {
+	var networkList []any = SafeListTyped(networks, currencyId)
+	var networkIds []any = []any{}
+	if networkList != nil {
+		for i := 0; i < len(networkList); i++ {
+			var networkId *string = this.SafeString(networkList, i)
+			if networkId != nil {
+				networkIds = append(networkIds, networkId)
+			}
+		}
+	} else {
+		var networkId *string = this.SafeString(networks, currencyId)
+		if networkId != nil {
+			if func() int {
+				if networkId == nil {
+					return -1
+				}
+				return strings.Index(*networkId, ",")
+			}() >= 0 {
+				var parts []string = strings.Split(*networkId, ",")
+				for j := 0; j < len(parts); j++ {
+					networkIds = append(networkIds, parts[j])
+				}
+			} else {
+				networkIds = append(networkIds, networkId)
+			}
+		}
+	}
+	var parsed []any = []any{}
+	for i := 0; i < len(networkIds); i++ {
+		var networkCode *string = this.NetworkIdToCode(func() any {
+			if i >= 0 && i < len(networkIds) {
+				return DerefScalar(networkIds[i])
+			}
+			return nil
+		}(), code)
+		if networkCode != nil {
+			parsed = append(parsed, strings.ToUpper(*networkCode))
+		}
+	}
+	return parsed
+}
+
+/**
+ * @method
+ * @name indodax#fetchDepositAddress
+ * @description fetch the deposit address for a currency associated with this account
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+ * @param {string} code unified currency code
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
+ * @returns {object} an [address structure]{@link https://docs.ccxt.com/?id=address-structure}
+ */
+func (this *Indodax) FetchDepositAddressAsync(code string, optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.fetchDepositAddressBody(ch, code, optionalArgs...)
+	return ch
+}
+func (this *Indodax) fetchDepositAddressBody(ch chan AsyncResult[any], code string, optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var params map[string]any = GetArgMap(optionalArgs, 0, map[string]any{})
+	_ = params
+
+	r := <-this.FetchDepositAddressesAsync([]any{code}, params)
+	if r.Err != nil {
+		panic(r.Err)
+	}
+	addresses := r.Value
+	var rows []any = this.ToArray(addresses)
+	for i := 0; i < len(rows); i++ {
+		var row any = func() any {
+			if i >= 0 && i < len(rows) {
+				return DerefScalar(rows[i])
+			}
+			return nil
+		}()
+		var rowCode *string = this.SafeString(row, "currency")
+		if rowCode != nil && *rowCode == code {
+
+			ch <- AsyncResult[any]{Value: row}
+			return nil
+		}
+	}
+	panic(InvalidAddress(this.Id + " fetchDepositAddress() could not find a deposit address for " + code + ", make sure you have created a corresponding deposit address in your wallet on the exchange website"))
 }
 
 /**
@@ -1876,8 +2651,10 @@ func (this *Indodax) ParseTransactionStatus(status *string) *string {
  * @name indodax#fetchDepositAddresses
  * @description fetch deposit addresses for multiple currencies and chain types
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
- * @param {string[]} [codes] list of unified currency codes, default is undefined
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+ * @param {string[]} [codes] list of unified currency codes, required when options.tapiVersion is "2"
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
  * @returns {object} a list of [address structures]{@link https://docs.ccxt.com/?id=address-structure}
  */
 func (this *Indodax) FetchDepositAddressesAsync(optionalArgs ...any) <-chan AsyncResult[any] {
@@ -1892,19 +2669,28 @@ func (this *Indodax) fetchDepositAddressesBody(ch chan AsyncResult[any], optiona
 	_ = codes
 	var params map[string]any = GetArgMap(optionalArgs, 1, map[string]any{})
 	_ = params
-	if this.Markets == nil {
+	if this.IsTapiV2() {
 
-		r := <-this.LoadMarketsAsync()
+		r := <-this.DepositAddressesV2Async(codes, params)
 		if r.Err != nil {
 			panic(r.Err)
 		}
+		ch <- AsyncResult[any]{Value: r.Value}
+		return nil
+	}
+	if this.Markets == nil {
+
+		r1 := <-this.LoadMarketsAsync()
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
 	}
 
-	r1 := <-this.PrivatePostGetInfo(params)
-	if r1.Err != nil {
-		panic(r1.Err)
+	r2 := <-this.PrivatePostGetInfo(params)
+	if r2.Err != nil {
+		panic(r2.Err)
 	}
-	var response map[string]any = r1.Value
+	var response map[string]any = r2.Value
 	//
 	//    {
 	//        success: '1',
@@ -1942,7 +2728,7 @@ func (this *Indodax) fetchDepositAddressesBody(ch chan AsyncResult[any], optiona
 	//
 	var data map[string]any = SafeMapTyped(response, "return")
 	var addresses map[string]any = SafeMapTyped(data, "address")
-	var networks map[string]any = SafeMapTyped(data, "network")
+	var networks map[string]any = this.SafeDictMap(data, "network", map[string]any{})
 	var addressKeys []string = nil
 	if addresses != nil {
 		addressKeys = make([]string, 0, len(addresses))
@@ -1950,59 +2736,1174 @@ func (this *Indodax) fetchDepositAddressesBody(ch chan AsyncResult[any], optiona
 			addressKeys = append(addressKeys, objectKey)
 		}
 	}
-	var result map[string]any = map[string]any{
-		"info": data,
-	}
+	var result []any = []any{}
 	for i := 0; i < len(addressKeys); i++ {
 		var marketId string = addressKeys[i]
 		var code *string = this.SafeCurrencyCode(marketId)
 		var address *string = this.SafeString(addresses, marketId)
 		if (address != nil) && ((codes == nil) || (this.InArray(code, codes))) {
 			this.CheckAddress(address)
-			var network any = nil
-			if func() bool { _, ok := networks[marketId]; return ok }() {
-				var networkId *string = this.SafeString(networks, marketId)
-				if networkId == nil {
-					panic(ExchangeError(this.Id + " fetchDepositAddresses() missing networkId"))
-				}
-				if func() int {
-					if networkId == nil {
-						return -1
-					}
-					return strings.Index(*networkId, ",")
-				}() >= 0 {
-					network = []any{}
-					if networkId == nil {
-						panic(ExchangeError(this.Id + " fetchDepositAddresses() missing networkId"))
-					}
-					var networkIds []string = strings.Split(*networkId, ",")
-					for j := 0; j < len(networkIds); j++ {
-						var _netIdTmp *string = this.NetworkIdToCode(networkIds[j], code)
-						if _netIdTmp != nil {
-							AppendToArray(&network, strings.ToUpper(*_netIdTmp))
-						}
-					}
-				} else {
-					var _netIdTmp *string = this.NetworkIdToCode(networkId, code)
-					if _netIdTmp != nil {
-						network = strings.ToUpper(*_netIdTmp)
-					}
-				}
-			}
-			var finalNetwork any = network // java req
+			var networkCodes any = this.V1DepositNetwork(networks, marketId, code)
+			var networkCount int = GetArrayLength(networkCodes)
 			if code != nil {
-				result[*code] = map[string]any{
-					"info":     map[string]any{},
-					"currency": code,
-					"network":  finalNetwork,
-					"address":  address,
-					"tag":      nil,
+				if networkCount < 1 {
+					result = append(result, map[string]any{
+						"info":     map[string]any{},
+						"currency": code,
+						"network":  nil,
+						"address":  address,
+						"tag":      nil,
+					})
+				} else {
+					for n := 0; n < networkCount; n++ {
+						var networkCode *string = SafeStringPtr(GetValue(networkCodes, n))
+						result = append(result, map[string]any{
+							"info":     map[string]any{},
+							"currency": code,
+							"network":  networkCode,
+							"address":  address,
+							"tag":      nil,
+						})
+					}
 				}
 			}
 		}
 	}
 
 	ch <- AsyncResult[any]{Value: result}
+	return nil
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#balanceV2
+ * @description query account balances on TAPI v2
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-account-information
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @returns {object} a balance structure
+ */
+func (this *Indodax) BalanceV2Async(optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.balanceV2Body(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) balanceV2Body(ch chan AsyncResult[any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var params map[string]any = GetArgMap(optionalArgs, 0, map[string]any{})
+	_ = params
+	if this.Markets == nil {
+
+		r := <-this.LoadMarketsAsync()
+		if r.Err != nil {
+			panic(r.Err)
+		}
+	}
+	var request map[string]any = map[string]any{}
+	var omitZeroBalances *bool = this.SafeBool(params, "omitZeroBalances")
+	var paramsOmitted map[string]any = this.OmitDict(params, []any{"omitZeroBalances"})
+	if omitZeroBalances != nil {
+		request["omitZeroBalances"] = omitZeroBalances
+	}
+
+	r1 := <-this.V2GetAccount(this.Extend(request, paramsOmitted))
+	if r1.Err != nil {
+		panic(r1.Err)
+	}
+	var response map[string]any = r1.Value
+
+	ch <- AsyncResult[any]{Value: this.ParseBalanceV2(response)}
+	return nil
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#parseBalanceV2
+ * @param {object} response account response
+ * @returns {object} a balance structure
+ */
+func (this *Indodax) ParseBalanceV2(response any) any {
+	var balances []any = SafeListTyped(response, "balances")
+	var result map[string]any = map[string]any{
+		"info": response,
+	}
+	for i := 0; i < len(balances); i++ {
+		var entry map[string]any = MapTyped(func() any {
+			if i >= 0 && i < len(balances) {
+				return DerefScalar(balances[i])
+			}
+			return nil
+		}())
+		var currencyId *string = this.SafeString(entry, "asset")
+		var code *string = this.SafeCurrencyCode(currencyId)
+		var account map[string]any = this.Account()
+		account["free"] = this.SafeString(entry, "free")
+		account["used"] = this.SafeString(entry, "locked")
+		if code != nil {
+			result[*code] = account
+		}
+	}
+	return this.SafeBalance(result)
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#parseV2Order
+ * @param {object} order raw order
+ * @param {object} [market] market structure
+ * @returns {object} an order structure
+ */
+func (this *Indodax) ParseV2Order(order any, optionalArgs ...any) any {
+	var market map[string]any = GetArgMap(optionalArgs, 0, nil)
+	_ = market
+	var marketId *string = this.SafeStringLower(order, "symbol")
+	var marketResolved map[string]any = this.SafeMarket(marketId, market)
+	var rawStatus *string = this.SafeString(order, "status")
+	var status *string = nil
+	if rawStatus != nil {
+		status = this.ParseOrderStatus(rawStatus)
+	}
+	var timestamp *int64 = this.SafeInteger2(order, "time", "submitTime")
+	var amount *string = this.SafeString2(order, "origQty", "oriQty")
+	var filled *string = this.SafeString(order, "executedQty")
+	var remaining *string = nil
+	if (amount != nil) && (filled != nil) {
+		remaining = Precise.StringSub(amount, filled)
+	}
+	return map[string]any{
+		"info":                order,
+		"id":                  this.SafeString2(order, "fullOrderId", "orderId"),
+		"clientOrderId":       this.SafeString2(order, "clientOrderId", "origClientOrderId"),
+		"timestamp":           timestamp,
+		"datetime":            this.Iso8601(timestamp),
+		"lastTradeTimestamp":  this.SafeInteger(order, "finishTime"),
+		"symbol":              this.SafeSymbol(marketId, marketResolved),
+		"type":                this.SafeStringLower(order, "type"),
+		"timeInForce":         this.SafeString(order, "timeInForce"),
+		"postOnly":            nil,
+		"side":                this.SafeStringLower(order, "side"),
+		"price":               this.ParseNumber(this.SafeString(order, "price")),
+		"triggerPrice":        nil,
+		"cost":                nil,
+		"average":             nil,
+		"amount":              this.ParseNumber(amount),
+		"filled":              this.ParseNumber(filled),
+		"remaining":           this.ParseNumber(remaining),
+		"status":              status,
+		"fee":                 nil,
+		"trades":              []any{},
+		"fees":                []any{},
+		"lastUpdateTimestamp": nil,
+		"reduceOnly":          nil,
+		"stopPrice":           nil,
+		"takeProfitPrice":     nil,
+		"stopLossPrice":       nil,
+	}
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#parseV2Trade
+ * @param {object} trade raw trade
+ * @param {object} [market] market structure
+ * @returns {object} a trade structure
+ */
+func (this *Indodax) ParseV2Trade(trade any, optionalArgs ...any) any {
+	var market map[string]any = GetArgMap(optionalArgs, 0, nil)
+	_ = market
+	var marketId *string = this.SafeStringLower(trade, "symbol")
+	var marketResolved map[string]any = this.SafeMarket(marketId, market)
+	var timestamp *int64 = this.SafeInteger(trade, "time")
+	var isBuyer *bool = this.SafeBool(trade, "isBuyer")
+	var side *string = nil
+	if isBuyer != nil && *isBuyer == true {
+		side = SafeStringPtr("buy")
+	} else if isBuyer != nil && *isBuyer == false {
+		side = SafeStringPtr("sell")
+	}
+	var isMaker *bool = this.SafeBool(trade, "isMaker")
+	var takerOrMaker *string = nil
+	if isMaker != nil && *isMaker == true {
+		takerOrMaker = SafeStringPtr("maker")
+	} else if isMaker != nil && *isMaker == false {
+		takerOrMaker = SafeStringPtr("taker")
+	}
+	var feeCost *string = this.SafeString(trade, "commission")
+	var fee map[string]any = nil
+	if feeCost != nil {
+		fee = map[string]any{
+			"currency": this.SafeCurrencyCode(this.SafeString(trade, "commissionAsset")),
+			"cost":     this.ParseNumber(feeCost),
+			"rate":     nil,
+		}
+	}
+	return TradeToMap(this.SafeTrade(map[string]any{
+		"id":           this.SafeString(trade, "tradeId"),
+		"info":         trade,
+		"timestamp":    timestamp,
+		"datetime":     this.Iso8601(timestamp),
+		"symbol":       this.SafeSymbol(marketId, marketResolved),
+		"type":         nil,
+		"side":         side,
+		"order":        this.SafeString(trade, "orderId"),
+		"takerOrMaker": takerOrMaker,
+		"price":        this.SafeString(trade, "price"),
+		"amount":       this.SafeString(trade, "qty"),
+		"cost":         this.SafeString(trade, "quoteQty"),
+		"fee":          fee,
+	}, market))
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#v2OrderRequest
+ * @param {string} id order id
+ * @param {string} symbol unified symbol
+ * @param {object} params extra parameters
+ * @returns {object[]} request and remaining params
+ */
+func (this *Indodax) V2OrderRequest(id any, symbol any, params any) any {
+	if IsEqual(symbol, nil) {
+		panic(ArgumentsRequired(this.Id + " order endpoints require a symbol argument"))
+	}
+	var market map[string]any = this.Market(symbol)
+	var clientOrderId *string = this.SafeString(params, "clientOrderId")
+	var paramsOmitted any = this.Omit(params, []any{"clientOrderId"})
+	var request map[string]any = map[string]any{
+		"symbol": this.TapiV2Symbol(market),
+	}
+	if clientOrderId != nil {
+		request["origClientOrderId"] = clientOrderId
+	} else {
+		request["orderId"] = this.V2OrderId(id)
+	}
+	return []any{market, request, paramsOmitted}
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#v2OrderId
+ * @description numeric id for GET and DELETE /api/v2/order. fullOrderId stays the unified id
+ * @param {string} orderId unified id, a number or a fullOrderId such as btcidr-limit-6423
+ * @returns {string} numeric order id
+ */
+func (this *Indodax) V2OrderId(orderId any) any {
+	var parts []string = Split(orderId, "-")
+	var numParts int = len(parts)
+	var tail *string = SafeStringPtr(GetValue(parts, numParts-1))
+	var digits string = "0123456789"
+	if GetLength(tail) < 1 {
+		return orderId
+	}
+	var index any = 0
+	for IsLessThan(index, GetLength(tail)) {
+		var character any = GetValue(tail, index)
+		if GetIndexOf(digits, character) < 0 {
+			return orderId
+		}
+		index = this.Sum(index, 1)
+	}
+	return tail
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#openOrdersV2
+ * @param {string} [symbol] unified symbol
+ * @param {int} [since] earliest timestamp
+ * @param {int} [limit] max number of orders
+ * @param {object} [params] extra parameters
+ * @returns {object[]} a list of order structures
+ */
+func (this *Indodax) OpenOrdersV2Async(optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.openOrdersV2Body(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) openOrdersV2Body(ch chan AsyncResult[any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var symbol *string = GetArgStringPtr(optionalArgs, 0, nil)
+	_ = symbol
+	var since *int64 = GetArgInt64Ptr(optionalArgs, 1, nil)
+	_ = since
+	var limit *int64 = GetArgInt64Ptr(optionalArgs, 2, nil)
+	_ = limit
+	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
+	_ = params
+	if this.Markets == nil {
+
+		r := <-this.LoadMarketsAsync()
+		if r.Err != nil {
+			panic(r.Err)
+		}
+	}
+	var market map[string]any = nil
+	var request map[string]any = map[string]any{}
+	if symbol != nil {
+		market = this.Market(symbol)
+		request["symbol"] = this.TapiV2Symbol(market)
+	}
+
+	listEp2858 := <-this.V2GetOpenOrders(this.Extend(request, params))
+	if listEp2858.Err != nil {
+		panic(listEp2858.Err)
+	}
+	var response []any = listEp2858.Value
+	var rows []any = this.ToArray(response)
+
+	ch <- AsyncResult[any]{Value: this.ParseOrders(rows, market, since, limit)}
+	return nil
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#clampV2Limit
+ * @param {int} [limit] requested limit
+ * @returns {int} limit clamped to 10-1000
+ */
+func (this *Indodax) ClampV2Limit(optionalArgs ...any) any {
+	limit := GetArg(optionalArgs, 0, nil)
+	_ = limit
+	if limit == nil {
+		return nil
+	}
+	if IsLessThan(limit, 10) {
+		return 10
+	}
+	if IsGreaterThan(limit, 1000) {
+		return 1000
+	}
+	return limit
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#historyV2
+ * @param {string} historyKind orders or trades
+ * @param {string} symbol unified symbol
+ * @param {int} [since] earliest timestamp
+ * @param {int} [until] latest timestamp
+ * @param {int} [limit] max rows per request
+ * @param {object} [params] extra parameters
+ * @returns {object[]} raw rows
+ */
+func (this *Indodax) HistoryV2Async(historyKind string, symbol any, optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.historyV2Body(ch, historyKind, symbol, optionalArgs...)
+	return ch
+}
+func (this *Indodax) historyV2Body(ch chan AsyncResult[any], historyKind string, symbol any, optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	since := GetArg(optionalArgs, 0, nil)
+	_ = since
+	until := GetArg(optionalArgs, 1, nil)
+	_ = until
+	var limit *int64 = GetArgInt64Ptr(optionalArgs, 2, nil)
+	_ = limit
+	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
+	_ = params
+	if this.Markets == nil {
+
+		r := <-this.LoadMarketsAsync()
+		if r.Err != nil {
+			panic(r.Err)
+		}
+	}
+	var market map[string]any = this.Market(symbol)
+	var paginate *bool = this.SafeBool(params, "paginate", false)
+	var paramsOmitted map[string]any = this.OmitDict(params, []any{"symbol", "startTime", "endTime", "limit", "paginate"})
+	var maxSpan int64 = (7 * 24) * 60 * 60 * 1000
+	var windows any = this.WindowV2(since, until, maxSpan)
+	var numWindows int = GetArrayLength(windows)
+	if (numWindows > 1) && (paginate == nil || *paginate != true) {
+		numWindows = 1
+	}
+	var requestLimit any = this.ClampV2Limit(limit)
+	var result []any = []any{}
+	for i := 0; i < numWindows; i++ {
+		var window any = GetValue(windows, i)
+		var request map[string]any = map[string]any{
+			"symbol": this.TapiV2Symbol(market),
+		}
+		if !IsEqual(GetValue(window, 0), nil) {
+			request["startTime"] = GetValue(window, 0)
+		}
+		if !IsEqual(GetValue(window, 1), nil) {
+			request["endTime"] = GetValue(window, 1)
+		}
+		if !IsEqual(requestLimit, nil) {
+			request["limit"] = requestLimit
+		}
+		var response map[string]any = nil
+		if historyKind == "orders" {
+
+			r1 := <-this.V2GetOrderHistories(this.Extend(request, paramsOmitted))
+			if r1.Err != nil {
+				panic(r1.Err)
+			}
+			response = r1.Value
+		} else {
+
+			r2 := <-this.V2GetMyTrades(this.Extend(request, paramsOmitted))
+			if r2.Err != nil {
+				panic(r2.Err)
+			}
+			response = r2.Value
+		}
+		var rows []any = SafeListTyped(response, "data")
+		for j := 0; j < len(rows); j++ {
+			result = append(result, func() any {
+				if j >= 0 && j < len(rows) {
+					return DerefScalar(rows[j])
+				}
+				return nil
+			}())
+		}
+	}
+
+	ch <- AsyncResult[any]{Value: result}
+	return nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchOrders
+ * @description fetches information on multiple orders made by the user
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#order-history
+ * @param {string} symbol unified market symbol of the market orders were made in
+ * @param {int} [since] the earliest time in ms to fetch orders for
+ * @param {int} [limit] the maximum number of order structures to retrieve
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {int} [params.until] the latest time in ms to fetch orders for
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
+ */
+func (this *Indodax) FetchOrdersAsync(optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.fetchOrdersBody(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) fetchOrdersBody(ch chan AsyncResult[any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	symbol := GetArg(optionalArgs, 0, nil)
+	_ = symbol
+	var since *int64 = GetArgInt64Ptr(optionalArgs, 1, nil)
+	_ = since
+	var limit *int64 = GetArgInt64Ptr(optionalArgs, 2, nil)
+	_ = limit
+	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
+	_ = params
+	if !this.IsTapiV2() {
+		panic(NotSupported(this.Id + " fetchOrders() requires options.tapiVersion set to \"2\""))
+	}
+	if symbol == nil {
+		panic(ArgumentsRequired(this.Id + " fetchOrders() requires a symbol argument"))
+	}
+	var until *int64 = this.SafeInteger(params, "until")
+	var paramsOmitted map[string]any = this.OmitDict(params, []any{"until"})
+
+	r := <-this.HistoryV2Async("orders", symbol, since, until, limit, paramsOmitted)
+	if r.Err != nil {
+		panic(r.Err)
+	}
+	rows := r.Value
+	var market map[string]any = this.Market(symbol)
+
+	ch <- AsyncResult[any]{Value: this.ParseOrders(rows, market, since, limit)}
+	return nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchMyTrades
+ * @description fetch all trades made by the user
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#trade-history
+ * @param {string} symbol unified market symbol
+ * @param {int} [since] the earliest time in ms to fetch trades for
+ * @param {int} [limit] the maximum number of trades structures to retrieve
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {int} [params.until] the latest time in ms to fetch trades for
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
+ */
+func (this *Indodax) FetchMyTradesAsync(optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.fetchMyTradesBody(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) fetchMyTradesBody(ch chan AsyncResult[any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	symbol := GetArg(optionalArgs, 0, nil)
+	_ = symbol
+	var since *int64 = GetArgInt64Ptr(optionalArgs, 1, nil)
+	_ = since
+	var limit *int64 = GetArgInt64Ptr(optionalArgs, 2, nil)
+	_ = limit
+	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
+	_ = params
+	if !this.IsTapiV2() {
+		panic(NotSupported(this.Id + " fetchMyTrades() requires options.tapiVersion set to \"2\""))
+	}
+	if symbol == nil {
+		panic(ArgumentsRequired(this.Id + " fetchMyTrades() requires a symbol argument"))
+	}
+	var until *int64 = this.SafeInteger(params, "until")
+	var paramsOmitted map[string]any = this.OmitDict(params, []any{"until"})
+
+	r := <-this.HistoryV2Async("trades", symbol, since, until, limit, paramsOmitted)
+	if r.Err != nil {
+		panic(r.Err)
+	}
+	rows := r.Value
+	var market map[string]any = this.Market(symbol)
+
+	ch <- AsyncResult[any]{Value: this.ParseTrades(rows, market, since, limit)}
+	return nil
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#depositAddressesV2
+ * @param {string[]} codes unified currency codes, required because each TAPI v2 query needs a coin
+ * @param {object} [params] extra parameters
+ * @returns {object[]} a list of address structures
+ */
+func (this *Indodax) DepositAddressesV2Async(optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.depositAddressesV2Body(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) depositAddressesV2Body(ch chan AsyncResult[any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var codes []string = GetArgStringSlice(optionalArgs, 0, nil)
+	_ = codes
+	var params map[string]any = GetArgMap(optionalArgs, 1, map[string]any{})
+	_ = params
+	if codes == nil {
+		panic(ArgumentsRequired(this.Id + " fetchDepositAddresses() requires symbols like BTC"))
+	}
+	var numCodes int = len(codes)
+	if numCodes < 1 {
+		panic(ArgumentsRequired(this.Id + " fetchDepositAddresses() requires symbols like BTC"))
+	}
+	if this.Markets == nil {
+
+		r := <-this.LoadMarketsAsync()
+		if r.Err != nil {
+			panic(r.Err)
+		}
+	}
+	var networkAndParams any = this.HandleNetworkCodeAndParams(params)
+	var networkCode *string = SafeStringPtr(GetValue(networkAndParams, 0))
+	var paramsOmitted any = GetValue(networkAndParams, 1)
+	var result []any = []any{}
+	for i := 0; i < numCodes; i++ {
+		var code *string = SafeStringPtr(codes[i])
+		var currency map[string]any = this.Currency(code)
+		var coinId *string = this.SafeString(currency, "id", code)
+		if (coinId == nil) || (coinId != nil && *coinId == "") {
+			continue
+		}
+		var request map[string]any = map[string]any{
+			"coin": coinId,
+		}
+		if networkCode != nil {
+			request["network"] = this.NetworkCodeToId(networkCode, code)
+		}
+
+		listEp3108 := <-this.V2GetCapitalDepositAddressList(this.Extend(request, paramsOmitted))
+		if listEp3108.Err != nil {
+			panic(listEp3108.Err)
+		}
+		var response []any = listEp3108.Value
+		var rows []any = this.ToArray(response)
+		var numRows int = len(rows)
+		for j := 0; j < numRows; j++ {
+			var row any = func() any {
+				if j >= 0 && j < len(rows) {
+					return DerefScalar(rows[j])
+				}
+				return nil
+			}()
+			var address *string = this.SafeString(row, "address")
+			if (address == nil) || (address != nil && *address == "") {
+				continue
+			}
+			this.CheckAddress(address)
+			var networkId *string = this.SafeString(row, "network")
+			var currencyCode *string = this.SafeString(currency, "code")
+			if currencyCode != nil {
+				result = append(result, map[string]any{
+					"info":     row,
+					"currency": currencyCode,
+					"network":  this.NetworkIdToCode(networkId, currencyCode),
+					"address":  address,
+					"tag":      this.SafeString(row, "tag"),
+				})
+			}
+		}
+	}
+
+	ch <- AsyncResult[any]{Value: result}
+	return nil
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#windowV2
+ * @param {int} [since] earliest timestamp
+ * @param {int} [until] latest timestamp
+ * @param {int} maxSpan maximum window in ms
+ * @returns {int[][]} windows of start and end
+ */
+func (this *Indodax) WindowV2(since any, until any, maxSpan any) any {
+	var windowStart any = since
+	var windowEnd any = until
+	if (IsEqual(windowStart, nil)) && (IsEqual(windowEnd, nil)) {
+		return []any{[]any{nil, nil}}
+	}
+	if IsEqual(windowEnd, nil) {
+		windowEnd = this.Milliseconds()
+	}
+	if IsEqual(windowStart, nil) {
+		windowStart = Subtract(windowEnd, maxSpan)
+	}
+	var windows []any = []any{}
+	var cursor any = windowStart
+	for IsLessThan(cursor, windowEnd) {
+		var chunkEnd any = this.Sum(cursor, maxSpan)
+		if IsGreaterThan(chunkEnd, windowEnd) {
+			chunkEnd = windowEnd
+		}
+		windows = append(windows, []any{cursor, chunkEnd})
+		if IsEqual(chunkEnd, cursor) {
+			break
+		}
+		cursor = chunkEnd
+	}
+	return windows
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#capitalHistoryV2
+ * @param {string} direction deposit or withdraw
+ * @param {string} [code] unified currency code
+ * @param {int} [since] earliest timestamp
+ * @param {int} [until] latest timestamp
+ * @param {int} [limit] max rows
+ * @param {object} [params] extra parameters
+ * @returns {object[]} raw rows
+ */
+func (this *Indodax) CapitalHistoryV2Async(direction string, optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.capitalHistoryV2Body(ch, direction, optionalArgs...)
+	return ch
+}
+func (this *Indodax) capitalHistoryV2Body(ch chan AsyncResult[any], direction string, optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var code *string = GetArgStringPtr(optionalArgs, 0, nil)
+	_ = code
+	since := GetArg(optionalArgs, 1, nil)
+	_ = since
+	until := GetArg(optionalArgs, 2, nil)
+	_ = until
+	var limit *int64 = GetArgInt64Ptr(optionalArgs, 3, nil)
+	_ = limit
+	var params map[string]any = GetArgMap(optionalArgs, 4, map[string]any{})
+	_ = params
+	var paginate *bool = this.SafeBool(params, "paginate", false)
+	var paramsOmitted map[string]any = this.OmitDict(params, []any{"coin", "startTime", "endTime", "limit", "paginate"})
+	var requestLimit any = this.ClampV2Limit(limit)
+	var maxSpan int64 = (90 * 24) * 60 * 60 * 1000
+	var windows any = this.WindowV2(since, until, maxSpan)
+	var numWindows int = GetArrayLength(windows)
+	if (numWindows > 1) && (paginate == nil || *paginate != true) {
+		numWindows = 1
+	}
+	var result []any = []any{}
+	for i := 0; i < numWindows; i++ {
+		var window any = GetValue(windows, i)
+		var request map[string]any = map[string]any{}
+		if code != nil {
+			var currency map[string]any = this.Currency(code)
+			request["coin"] = currency["id"]
+		}
+		if !IsEqual(GetValue(window, 0), nil) {
+			request["startTime"] = GetValue(window, 0)
+		}
+		if !IsEqual(GetValue(window, 1), nil) {
+			request["endTime"] = GetValue(window, 1)
+		}
+		if !IsEqual(requestLimit, nil) {
+			request["limit"] = requestLimit
+		}
+		var response []any = nil
+		if direction == "deposit" {
+
+			listEp3237 := <-this.V2GetCapitalDepositHisrec(this.Extend(request, paramsOmitted))
+			if listEp3237.Err != nil {
+				panic(listEp3237.Err)
+			}
+			response = listEp3237.Value
+		} else {
+
+			listEp3240 := <-this.V2GetCapitalWithdrawHistory(this.Extend(request, paramsOmitted))
+			if listEp3240.Err != nil {
+				panic(listEp3240.Err)
+			}
+			response = listEp3240.Value
+		}
+		var rows []any = this.ToArray(response)
+		for j := 0; j < len(rows); j++ {
+			var txType string = func() string {
+				if direction == "deposit" {
+					return "deposit"
+				}
+				return "withdraw"
+			}()
+			var row map[string]any = this.Extend(func() any {
+				if j >= 0 && j < len(rows) {
+					return DerefScalar(rows[j])
+				}
+				return nil
+			}(), map[string]any{
+				"txType": txType,
+			})
+			result = append(result, row)
+		}
+	}
+
+	ch <- AsyncResult[any]{Value: result}
+	return nil
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#fiatHistoryV2
+ * @param {string} direction deposit or withdraw
+ * @param {string} [code] unified currency code
+ * @param {int} [since] earliest timestamp
+ * @param {int} [until] latest timestamp
+ * @param {int} [limit] max rows
+ * @param {object} [params] extra parameters
+ * @returns {object[]} raw rows
+ */
+func (this *Indodax) FiatHistoryV2Async(direction string, optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.fiatHistoryV2Body(ch, direction, optionalArgs...)
+	return ch
+}
+func (this *Indodax) fiatHistoryV2Body(ch chan AsyncResult[any], direction string, optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var code *string = GetArgStringPtr(optionalArgs, 0, nil)
+	_ = code
+	since := GetArg(optionalArgs, 1, nil)
+	_ = since
+	until := GetArg(optionalArgs, 2, nil)
+	_ = until
+	var limit *int64 = GetArgInt64Ptr(optionalArgs, 3, nil)
+	_ = limit
+	var params map[string]any = GetArgMap(optionalArgs, 4, map[string]any{})
+	_ = params
+	if (code != nil) && (code == nil || *code != "IDR") {
+
+		ch <- AsyncResult[any]{Value: []any{}}
+		return nil
+	}
+	var paginate *bool = this.SafeBool(params, "paginate", false)
+	var paramsOmitted map[string]any = this.OmitDict(params, []any{"transactionType", "beginTime", "endTime", "limit", "paginate"})
+	var requestLimit any = this.ClampV2Limit(limit)
+	var maxSpan int64 = (30 * 24) * 60 * 60 * 1000
+	var windows any = this.WindowV2(since, until, maxSpan)
+	var numWindows int = GetArrayLength(windows)
+	if (numWindows > 1) && (paginate == nil || *paginate != true) {
+		numWindows = 1
+	}
+	var result []any = []any{}
+	for i := 0; i < numWindows; i++ {
+		var window any = GetValue(windows, i)
+		var request map[string]any = map[string]any{}
+		if direction == "deposit" {
+			request["transactionType"] = "0"
+		}
+		if !IsEqual(GetValue(window, 0), nil) {
+			request["beginTime"] = GetValue(window, 0)
+		}
+		if !IsEqual(GetValue(window, 1), nil) {
+			request["endTime"] = GetValue(window, 1)
+		}
+		if !IsEqual(requestLimit, nil) {
+			request["limit"] = requestLimit
+		}
+
+		r := <-this.V2GetFiatOrders(this.Extend(request, paramsOmitted))
+		if r.Err != nil {
+			panic(r.Err)
+		}
+		var response map[string]any = r.Value
+		var rows []any = SafeListTyped(response, "data")
+		for j := 0; j < len(rows); j++ {
+			var txType string = func() string {
+				if direction == "deposit" {
+					return "deposit"
+				}
+				return "withdraw"
+			}()
+			var row map[string]any = this.Extend(func() any {
+				if j >= 0 && j < len(rows) {
+					return DerefScalar(rows[j])
+				}
+				return nil
+			}(), map[string]any{
+				"txType": txType,
+			})
+			result = append(result, row)
+		}
+	}
+
+	ch <- AsyncResult[any]{Value: result}
+	return nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchDeposits
+ * @description fetch all deposits made to an account
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
+ * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
+ * @param {int} [since] the earliest time in ms to fetch deposits for
+ * @param {int} [limit] the maximum number of deposits structures to retrieve
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {int} [params.until] the latest time in ms to fetch deposits for
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
+ * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
+ */
+func (this *Indodax) FetchDepositsAsync(optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.fetchDepositsBody(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) fetchDepositsBody(ch chan AsyncResult[any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var code *string = GetArgStringPtr(optionalArgs, 0, nil)
+	_ = code
+	var since *int64 = GetArgInt64Ptr(optionalArgs, 1, nil)
+	_ = since
+	var limit *int64 = GetArgInt64Ptr(optionalArgs, 2, nil)
+	_ = limit
+	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
+	_ = params
+	if !this.IsTapiV2() {
+		panic(NotSupported(this.Id + " fetchDeposits() requires options.tapiVersion set to \"2\""))
+	}
+	if this.Markets == nil {
+
+		r := <-this.LoadMarketsAsync()
+		if r.Err != nil {
+			panic(r.Err)
+		}
+	}
+	var until *int64 = this.SafeInteger(params, "until")
+	var paramsOmitted map[string]any = this.OmitDict(params, []any{"until"})
+	var rows []any = []any{}
+	if code == nil || *code != "IDR" {
+
+		r1 := <-this.CapitalHistoryV2Async("deposit", code, since, until, limit, paramsOmitted)
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
+		cryptoRows := r1.Value
+		rows = this.ArrayConcat(rows, cryptoRows)
+	}
+	if (code == nil) || (code != nil && *code == "IDR") {
+
+		r2 := <-this.FiatHistoryV2Async("deposit", code, since, until, limit, paramsOmitted)
+		if r2.Err != nil {
+			panic(r2.Err)
+		}
+		fiatRows := r2.Value
+		rows = this.ArrayConcat(rows, fiatRows)
+	}
+	var currency any = func() any {
+		if code == nil {
+			return nil
+		}
+		return this.Currency(code)
+	}()
+
+	ch <- AsyncResult[any]{Value: this.ParseTransactions(rows, currency, since, limit)}
+	return nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchWithdrawals
+ * @description fetch all withdrawals made from an account
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
+ * @param {string} [code] unified currency code. Omitting code returns only BTC crypto withdrawals plus IDR fiat withdrawals, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+ * @param {int} [since] the earliest time in ms to fetch withdrawals for
+ * @param {int} [limit] the maximum number of withdrawals structures to retrieve
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {int} [params.until] the latest time in ms to fetch withdrawals for
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
+ * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
+ */
+func (this *Indodax) FetchWithdrawalsAsync(optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.fetchWithdrawalsBody(ch, optionalArgs...)
+	return ch
+}
+func (this *Indodax) fetchWithdrawalsBody(ch chan AsyncResult[any], optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var code *string = GetArgStringPtr(optionalArgs, 0, nil)
+	_ = code
+	var since *int64 = GetArgInt64Ptr(optionalArgs, 1, nil)
+	_ = since
+	var limit *int64 = GetArgInt64Ptr(optionalArgs, 2, nil)
+	_ = limit
+	var params map[string]any = GetArgMap(optionalArgs, 3, map[string]any{})
+	_ = params
+	if !this.IsTapiV2() {
+		panic(NotSupported(this.Id + " fetchWithdrawals() requires options.tapiVersion set to \"2\""))
+	}
+	if this.Markets == nil {
+
+		r := <-this.LoadMarketsAsync()
+		if r.Err != nil {
+			panic(r.Err)
+		}
+	}
+	var until *int64 = this.SafeInteger(params, "until")
+	var paramsOmitted map[string]any = this.OmitDict(params, []any{"until"})
+	var rows []any = []any{}
+	if code == nil || *code != "IDR" {
+
+		r1 := <-this.CapitalHistoryV2Async("withdraw", code, since, until, limit, paramsOmitted)
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
+		cryptoRows := r1.Value
+		rows = this.ArrayConcat(rows, cryptoRows)
+	}
+	if (code == nil) || (code != nil && *code == "IDR") {
+
+		r2 := <-this.FiatHistoryV2Async("withdraw", code, since, until, limit, paramsOmitted)
+		if r2.Err != nil {
+			panic(r2.Err)
+		}
+		fiatRows := r2.Value
+		rows = this.ArrayConcat(rows, fiatRows)
+	}
+	var currency any = func() any {
+		if code == nil {
+			return nil
+		}
+		return this.Currency(code)
+	}()
+
+	ch <- AsyncResult[any]{Value: this.ParseTransactions(rows, currency, since, limit)}
+	return nil
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#parseV2Transaction
+ * @param {object} transaction raw transaction
+ * @param {object} [currency] currency structure
+ * @returns {object} a transaction structure
+ */
+func (this *Indodax) ParseV2Transaction(transaction any, optionalArgs ...any) any {
+	var currency map[string]any = GetArgMap(optionalArgs, 0, nil)
+	_ = currency
+	var txKind *string = this.SafeString(transaction, "txType")
+	var coin *string = this.SafeString(transaction, "coin")
+	var fiatCurrency *string = this.SafeString(transaction, "fiatCurrency")
+	var currencyId *string = func() *string {
+		if coin != nil {
+			return coin
+		}
+		return fiatCurrency
+	}()
+	var code *string = this.SafeCurrencyCode(currencyId, currency)
+	var status *string = this.SafeStringN(transaction, []any{"withdrawStatus", "depositStatus", "status"})
+	var timestamp *int64 = this.SafeInteger2(transaction, "createTime", "updateTime")
+	if timestamp == nil {
+		timestamp = this.SafeIntegerN(transaction, []any{"applyTime", "insertTime", "completeTime"})
+	}
+	if timestamp == nil {
+		timestamp = this.Parse8601(this.SafeStringN(transaction, []any{"applyTime", "insertTime", "completeTime"}))
+	}
+	var updated *int64 = this.SafeInteger2(transaction, "updateTime", "completeTime")
+	if updated == nil {
+		updated = this.Parse8601(this.SafeString(transaction, "completeTime"))
+	}
+	var info any = this.Omit(transaction, []any{"txType"})
+	var feeCost *float64 = this.SafeNumber2(transaction, "transactionFee", "totalFee")
+	var fee map[string]any = nil
+	if feeCost != nil {
+		fee = map[string]any{
+			"currency": code,
+			"cost":     feeCost,
+			"rate":     nil,
+		}
+	}
+	var networkId *string = this.SafeString(transaction, "network")
+	return map[string]any{
+		"id":          this.SafeString2(transaction, "id", "orderNo"),
+		"txid":        this.SafeString(transaction, "txId"),
+		"timestamp":   timestamp,
+		"datetime":    this.Iso8601(timestamp),
+		"network":     this.NetworkIdToCode(networkId, code),
+		"addressFrom": nil,
+		"address":     this.SafeString(transaction, "address"),
+		"addressTo":   nil,
+		"amount":      this.SafeNumber(transaction, "amount"),
+		"type": func() any {
+			if txKind == nil {
+				return nil
+			}
+			return txKind
+		}(),
+		"currency": code,
+		"status":   this.ParseTransactionStatus(status),
+		"updated":  updated,
+		"tagFrom":  nil,
+		"tag":      this.SafeString(transaction, "addressTag"),
+		"tagTo":    nil,
+		"comment":  nil,
+		"internal": nil,
+		"fee":      fee,
+		"info":     info,
+	}
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#sendWithdrawV2
+ * @param {string} code unified currency code
+ * @param {float} amount amount to withdraw
+ * @param {string} address destination address or bank account number
+ * @param {string} [tag] destination tag or memo, sent as addressTag
+ * @param {object} [params] extra parameters
+ * @returns {object} a transaction structure
+ */
+func (this *Indodax) SendWithdrawV2Async(code string, amount any, address any, optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.sendWithdrawV2Body(ch, code, amount, address, optionalArgs...)
+	return ch
+}
+func (this *Indodax) sendWithdrawV2Body(ch chan AsyncResult[any], code string, amount any, address any, optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	var tag *string = GetArgStringPtr(optionalArgs, 0, nil)
+	_ = tag
+	var params map[string]any = GetArgMap(optionalArgs, 1, map[string]any{})
+	_ = params
+	var withdrawTag any = this.HandleWithdrawTagAndParams(tag, params)
+	var tagValue *string = SafeStringPtr(GetValue(withdrawTag, 0))
+	var paramsAfterTag any = GetValue(withdrawTag, 1)
+	if this.Markets == nil {
+
+		r := <-this.LoadMarketsAsync()
+		if r.Err != nil {
+			panic(r.Err)
+		}
+	}
+	var currency map[string]any = this.Currency(code)
+	if GetValue(currency, "code") == "IDR" {
+		var bankCode *string = this.SafeString(paramsAfterTag, "bankCode")
+		if (bankCode == nil) || (bankCode != nil && *bankCode == "") {
+			panic(ArgumentsRequired(this.Id + " withdraw() requires a params.bankCode for IDR, the 3-digit bank code"))
+		}
+		var clientRequestId *string = this.SafeString(paramsAfterTag, "clientOrderId", strconv.FormatInt(this.Milliseconds(), 10))
+		var paramsOmitted any = this.Omit(paramsAfterTag, []any{"bankCode", "clientOrderId"})
+		var accountNumberJson string = this.Json(address)
+		var bankCodeJson string = this.Json(bankCode)
+		// hex braces: a '{...}' literal is rewritten to array() by the PHP transpiler
+		var openBrace string = this.BinaryToString(this.Base16ToBinary("7b"))
+		var closeBrace string = this.BinaryToString(this.Base16ToBinary("7d"))
+		var accountInfo string = openBrace + "\"accountNumber\":" + accountNumberJson + ",\"bankCodeForPix\":" + bankCodeJson + closeBrace
+		var fiatRequest map[string]any = map[string]any{
+			"apiPaymentMethod": "bank_transfer",
+			"currency":         "idr",
+			"amount":           this.ParseToInt(amount),
+			"accountInfo":      accountInfo,
+			"clientRequestId":  clientRequestId,
+		}
+
+		r1 := <-this.V2PostFiatWithdraw(this.Extend(fiatRequest, paramsOmitted))
+		if r1.Err != nil {
+			panic(r1.Err)
+		}
+		var fiatResponse map[string]any = r1.Value
+		var data map[string]any = SafeMapTyped(fiatResponse, "data")
+		var orderId *string = this.SafeString(data, "orderId")
+
+		ch <- AsyncResult[any]{Value: this.ParseV2Transaction(map[string]any{
+			"orderNo":      orderId,
+			"fiatCurrency": "IDR",
+			"amount":       this.NumberToString(amount),
+			"txType":       "withdraw",
+			"address":      address,
+		}, currency)}
+		return nil
+	}
+	this.CheckAddress(address)
+	var networkAndParams any = this.HandleNetworkCodeAndParams(paramsAfterTag)
+	var networkCode *string = SafeStringPtr(GetValue(networkAndParams, 0))
+	var paramsAfterNetwork any = GetValue(networkAndParams, 1)
+	var withdrawOrderId *string = this.SafeString(paramsAfterNetwork, "clientOrderId", strconv.FormatInt(this.Milliseconds(), 10))
+	var paramsForWithdraw any = this.Omit(paramsAfterNetwork, []any{"clientOrderId"})
+	var request map[string]any = map[string]any{
+		"coin":            currency["id"],
+		"address":         address,
+		"amount":          this.NumberToString(amount),
+		"withdrawOrderId": withdrawOrderId,
+	}
+	if networkCode != nil {
+		request["network"] = this.NetworkCodeToId(networkCode, currency["code"])
+	}
+	if (tagValue != nil) && (tagValue == nil || *tagValue != "") {
+		request["addressTag"] = tagValue
+	}
+
+	r2 := <-this.V2PostCapitalWithdrawApply(this.Extend(request, paramsForWithdraw))
+	if r2.Err != nil {
+		panic(r2.Err)
+	}
+	response := r2.Raw
+	var annotated map[string]any = this.Extend(response, map[string]any{
+		"txType": "withdraw",
+	})
+
+	ch <- AsyncResult[any]{Value: this.ParseV2Transaction(annotated, currency)}
 	return nil
 }
 func (this *Indodax) Sign(path string, optionalArgs ...any) any {
@@ -2014,43 +3915,57 @@ func (this *Indodax) Sign(path string, optionalArgs ...any) any {
 	_ = params
 	headers := GetArg(optionalArgs, 3, nil)
 	_ = headers
-	var body *string = GetArgStringPtr(optionalArgs, 4, nil)
+	body := GetArg(optionalArgs, 4, nil)
 	_ = body
 	var apiUrl *string = this.SafeString(this.Urls["api"], api)
 	if apiUrl == nil {
 		panic(ExchangeError(this.Id + " sign() has no API URL for this endpoint"))
 	}
 	var url any = apiUrl
-	var privateBody any = nil
-	var privateHeaders any = nil
-	var isPublic bool = (api == "public")
-	if isPublic {
+	var requestBody any = body
+	var requestHeaders any = headers
+	if api == "public" {
 		var query any = this.Omit(params, this.ExtractParams(path))
 		var requestPath string = "/" + this.ImplodeParams(path, params)
 		url = Add(url, requestPath)
 		if len(ObjectKeys(query)) > 0 {
 			url = Add(url, "?"+this.UrlencodeWithArrayRepeat(query))
 		}
+	} else if api == "v2" {
+		this.CheckRequiredCredentials()
+		var sandboxUrl *string = this.SafeString(this.Options, "sandboxUrl")
+		if (sandboxUrl != nil) && (sandboxUrl == nil || *sandboxUrl != "") {
+			url = sandboxUrl
+		}
+		url = Add(Add(url, "/api/v2/"), this.ImplodeParams(path, params))
+		var query string = this.Urlencode(this.Extend(map[string]any{
+			"timestamp":  this.RequestTimestamp(),
+			"recvWindow": this.SafeInteger(this.Options, "recvWindow", 5000),
+		}, params))
+		var signature string = this.Hmac(this.Encode(query), this.Encode(this.Secret), sha256)
+		requestHeaders = map[string]any{
+			"Accept":   "application/json",
+			"X-APIKEY": this.ApiKey,
+			"Sign":     signature,
+		}
+		if method == "POST" {
+			requestBody = query
+			AddElementToObject(requestHeaders, "Content-Type", "application/x-www-form-urlencoded")
+		} else {
+			url = Add(url, "?"+query)
+		}
 	} else {
 		this.CheckRequiredCredentials()
-		privateBody = this.Urlencode(this.Extend(map[string]any{
+		requestBody = this.Urlencode(this.Extend(map[string]any{
 			"method":     path,
-			"timestamp":  this.Nonce(),
-			"recvWindow": GetValue(this.Options, "recvWindow"),
+			"timestamp":  this.RequestTimestamp(),
+			"recvWindow": this.SafeInteger(this.Options, "recvWindow", 5000),
 		}, params))
-		privateHeaders = map[string]any{
+		requestHeaders = map[string]any{
 			"Content-Type": "application/x-www-form-urlencoded",
 			"Key":          this.ApiKey,
-			"Sign":         this.Hmac(this.Encode(privateBody), this.Encode(this.Secret), sha512),
+			"Sign":         this.Hmac(this.Encode(requestBody), this.Encode(this.Secret), sha512),
 		}
-	}
-	var requestBody any = privateBody
-	if isPublic {
-		requestBody = body
-	}
-	var requestHeaders any = privateHeaders
-	if isPublic {
-		requestHeaders = headers
 	}
 	return map[string]any{
 		"url":     url,
@@ -2058,6 +3973,87 @@ func (this *Indodax) Sign(path string, optionalArgs ...any) any {
 		"body":    requestBody,
 		"headers": requestHeaders,
 	}
+}
+
+/**
+ * @ignore
+ * @method
+ * @name indodax#request
+ * @description send a request and retry once when the exchange rejects the timestamp
+ * @param {string} path endpoint path
+ * @param {string} [api] api section, public, private, or v2
+ * @param {string} [method] http method
+ * @param {object} [params] request parameters
+ * @param {object} [headers] request headers
+ * @param {string} [body] request body
+ * @param {object} [config] request config
+ * @returns {object} the exchange response
+ */
+func (this *Indodax) RequestAsync(path any, optionalArgs ...any) <-chan AsyncResult[any] {
+	ch := make(chan AsyncResult[any], 1)
+	go this.requestBody(ch, path, optionalArgs...)
+	return ch
+}
+func (this *Indodax) requestBody(ch chan AsyncResult[any], path any, optionalArgs ...any) any {
+	defer close(ch)
+	defer ReturnPanicError(ch)
+	api := GetArg(optionalArgs, 0, "public")
+	_ = api
+	var method string = GetArgString(optionalArgs, 1, "GET")
+	_ = method
+	params := GetArg(optionalArgs, 2, map[string]any{})
+	_ = params
+	headers := GetArg(optionalArgs, 3, nil)
+	_ = headers
+	body := GetArg(optionalArgs, 4, nil)
+	_ = body
+	config := GetArg(optionalArgs, 5, map[string]any{})
+	_ = config
+	var response any = nil
+
+	{
+		func(this *Indodax) (ret_ any) {
+			defer func() {
+				if e := recover(); e != nil {
+					if e == "break" {
+						return
+					}
+					ret_ = func(this *Indodax) any {
+						// catch block:
+						var adjusted *bool = this.SafeBool(this.Options, "timestampAdjusted", false)
+						if (api == "public") || (adjusted != nil && *adjusted) || !(IsInstance(e, InvalidNonce)) {
+							panic(e)
+						}
+
+						r := <-this.LoadTimeDifferenceAsync()
+						if r.Err != nil {
+							panic(r.Err)
+						}
+						this.Options.Store("timestampAdjusted", true)
+
+						r1 := <-this.Fetch2Async(path, api, method, params, headers, body, config)
+						if r1.Err != nil {
+							panic(r1.Err)
+						}
+						response = r1.Value
+						return nil
+					}(this)
+				}
+			}()
+			// try block:
+
+			r2 := <-this.Fetch2Async(path, api, method, params, headers, body, config)
+			if r2.Err != nil {
+				panic(r2.Err)
+			}
+			response = r2.Value
+			return nil
+		}(this)
+
+	}
+
+	ch <- AsyncResult[any]{Value: response}
+	return nil
 }
 func (this *Indodax) HandleErrors(code any, reason any, url any, method any, headers any, body string, response any, requestHeaders any, requestBody any) any {
 	if response == nil {
@@ -2069,6 +4065,15 @@ func (this *Indodax) HandleErrors(code any, reason any, url any, method any, hea
 	// {"success":"1","status":"approved","withdraw_currency":"strm","withdraw_address":"0x2b9A8cd5535D99b419aEfFBF1ae8D90a7eBdb24E","withdraw_amount":"2165.05767839","fee":"21.11000000","amount_after_fee":"2143.94767839","submit_time":"1730759489","withdraw_id":"strm-3423","txid":""}
 	if IsArray(response) {
 		return nil // public endpoints may return []-arrays
+	}
+	var errorCode *int64 = this.SafeInteger(response, "code")
+	if (errorCode != nil) && (errorCode == nil || *errorCode != 0) {
+		var message *string = this.SafeString(response, "msg", "")
+		var errorFeedback string = this.Id + " " + body
+		this.ThrowBroadlyMatchedException(this.Exceptions["broad"], message, errorFeedback)
+		var codeString *string = this.NumberToString(errorCode)
+		this.ThrowExactlyMatchedException(this.Exceptions["exact"], codeString, errorFeedback)
+		panic(ExchangeError(errorFeedback))
 	}
 	var error *string = this.SafeString(response, "error", "")
 	if !(InOp(response, "success")) && (error != nil && *error == "") {
@@ -2087,6 +4092,10 @@ func (this *Indodax) HandleErrors(code any, reason any, url any, method any, hea
 		}
 	}
 	var feedback string = this.Id + " " + body
+	var errorCodeText *string = this.SafeString(response, "error_code")
+	if errorCodeText != nil {
+		this.ThrowExactlyMatchedException(this.Exceptions["exact"], errorCodeText, feedback)
+	}
 	this.ThrowExactlyMatchedException(this.Exceptions["exact"], error, feedback)
 	this.ThrowBroadlyMatchedException(this.Exceptions["broad"], error, feedback)
 	panic(ExchangeError(feedback))
@@ -2129,6 +4138,7 @@ func (this *Indodax) FetchTime(params ...any) (int64, error) {
  * @name indodax#fetchMarkets
  * @description retrieves data on all markets for indodax
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
  * @param {object} [params] extra parameters specific to the exchange API endpoint
  * @returns {object[]} an array of objects representing market data
  */
@@ -2143,10 +4153,82 @@ func (this *Indodax) FetchMarkets(params ...any) ([]MarketInterface, error) {
 
 /**
  * @method
+ * @name indodax#fetchTradingFees
+ * @description fetch the public trading fees for multiple markets
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @returns {object} a dictionary of [fee structures]{@link https://docs.ccxt.com/?id=trading-fee-structure} indexed by market symbols
+ */
+func (this *Indodax) FetchTradingFees(params ...any) (TradingFees, error) {
+	r := <-this.FetchTradingFeesAsync(params...)
+	if r.Err != nil {
+		return TradingFees{}, r.Err
+	}
+	var res TradingFees = NewTradingFees(r.Value)
+	return res, nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchTradingLimits
+ * @description fetch the public trading limits and price steps for markets
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+ * @param {string[]|undefined} symbols unified market symbols
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @returns {object} a dictionary of [trading limits structures]{@link https://docs.ccxt.com/?id=trading-limits-structure} indexed by market symbol
+ */
+func (this *Indodax) FetchTradingLimits(options ...FetchTradingLimitsOptions) (map[string]any, error) {
+
+	opts := FetchTradingLimitsOptionsStruct{}
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+	r := <-this.FetchTradingLimitsAsync(opts.Symbols, opts.Params)
+	if r.Err != nil {
+		return map[string]any{}, r.Err
+	}
+	var res map[string]any = r.Value
+	return res, nil
+}
+
+/**
+ * @method
+ * @name indodax#editOrder
+ * @description edit a trade order
+ * @param {string} id order id
+ * @param {string} symbol unified symbol of the market to edit an order in
+ * @param {string} type 'market' or 'limit'
+ * @param {string} side 'buy' or 'sell'
+ * @param {float} [amount] how much of the currency you want to trade in units of the base currency
+ * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
+ */
+func (this *Indodax) EditOrder(id string, symbol string, typeVar string, side string, options ...EditOrderOptions) (Order, error) {
+
+	opts := EditOrderOptionsStruct{}
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+	r := <-this.EditOrderAsync(id, symbol, typeVar, side, opts.Amount, opts.Price, opts.Params)
+	if r.Err != nil {
+		return Order{}, r.Err
+	}
+	var res Order = NewOrder(r.Value)
+	return res, nil
+}
+
+/**
+ * @method
  * @name indodax#fetchBalance
  * @description query for balance and get the amount of funds available for trading or funds locked in orders
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#get-info-endpoint
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-account-information
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {boolean} [params.omitZeroBalances] true to omit zero balances, only used when options.tapiVersion is "2"
  * @returns {object} a [balance structure]{@link https://docs.ccxt.com/?id=balance-structure}
  */
 func (this *Indodax) FetchBalance(params ...any) (Balances, error) {
@@ -2289,9 +4371,11 @@ func (this *Indodax) FetchOHLCV(symbol string, options ...FetchOHLCVOptions) ([]
  * @name indodax#fetchOrder
  * @description fetches information on an order made by the user
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#get-order-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-order
  * @param {string} id order id
  * @param {string} symbol unified symbol of the market the order was made in
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
  * @returns {object} An [order structure]{@link https://docs.ccxt.com/?id=order-structure}
  */
 func (this *Indodax) FetchOrder(id string, options ...FetchOrderOptions) (Order, error) {
@@ -2314,6 +4398,7 @@ func (this *Indodax) FetchOrder(id string, options ...FetchOrderOptions) (Order,
  * @name indodax#fetchOpenOrders
  * @description fetch all unfilled currently open orders
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#open-orders-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#pending-order
  * @param {string} symbol unified market symbol
  * @param {int} [since] the earliest time in ms to fetch open orders for
  * @param {int} [limit] the maximum number of  open orders structures to retrieve
@@ -2340,6 +4425,7 @@ func (this *Indodax) FetchOpenOrders(options ...FetchOpenOrdersOptions) ([]Order
  * @name indodax#fetchClosedOrders
  * @description fetches information on multiple closed orders made by the user
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#order-history
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#order-history
  * @param {string} symbol unified market symbol of the market orders were made in
  * @param {int} [since] the earliest time in ms to fetch orders for
  * @param {int} [limit] the maximum number of order structures to retrieve
@@ -2366,12 +4452,17 @@ func (this *Indodax) FetchClosedOrders(options ...FetchClosedOrdersOptions) ([]O
  * @name indodax#createOrder
  * @description create a trade order
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#trade-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
  * @param {string} symbol unified symbol of the market to create an order in
  * @param {string} type 'market' or 'limit'
  * @param {string} side 'buy' or 'sell'
  * @param {float} amount how much of currency you want to trade in units of base currency
  * @param {float} [price] the price at which the order is to be fulfilled, in units of the quote currency, ignored in market orders
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {float} [params.cost] quote amount to spend on a market buy, only used when options.tapiVersion is "2"
+ * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
+ * @param {string} [params.timeInForce] GTC or MOC, only used when options.tapiVersion is "2"
+ * @param {string} [params.selfTradePreventionMode] EXPIRE_TAKER, EXPIRE_MAKER, or EXPIRE_BOTH, only used when options.tapiVersion is "2"
  * @returns {object} an [order structure]{@link https://docs.ccxt.com/?id=order-structure}
  */
 func (this *Indodax) CreateOrder(symbol string, typeVar string, side string, amount float64, options ...CreateOrderOptions) (Order, error) {
@@ -2394,9 +4485,12 @@ func (this *Indodax) CreateOrder(symbol string, typeVar string, side string, amo
  * @name indodax#cancelOrder
  * @description cancels an open order
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#cancel-order-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#cancel-order
  * @param {string} id order id
  * @param {string} symbol unified symbol of the market the order was made in
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.side] order side, required on TAPI v1 and not used when options.tapiVersion is "2"
+ * @param {string} [params.clientOrderId] client order id, only used when options.tapiVersion is "2"
  * @returns {object} An [order structure]{@link https://docs.ccxt.com/?id=order-structure}
  */
 func (this *Indodax) CancelOrder(id string, options ...CancelOrderOptions) (Order, error) {
@@ -2467,7 +4561,8 @@ func (this *Indodax) FetchDepositWithdrawFee(code string, options ...FetchDeposi
  * @name indodax#fetchDepositsWithdrawals
  * @description fetch history of deposits and withdrawals
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#transaction-history-endpoints
- * @param {string} [code] unified currency code for the currency of the deposit/withdrawals, default is undefined
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
+ * @param {string} [code] unified currency code. On TAPI v2, omitting code returns only BTC crypto history plus IDR fiat history, because the exchange defaults coin to BTC
  * @param {int} [since] timestamp in ms of the earliest deposit/withdrawal, default is undefined
  * @param {int} [limit] max number of deposit/withdrawals to return, default is undefined
  * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -2493,11 +4588,16 @@ func (this *Indodax) FetchDepositsWithdrawals(options ...FetchDepositsWithdrawal
  * @name indodax#withdraw
  * @description make a withdrawal
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#withdraw-coin-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#withdraw-coin
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#withdraw-idr
  * @param {string} code unified currency code
  * @param {float} amount the amount to withdraw
  * @param {string} address the address to withdraw to
  * @param {string} tag
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.network] unified network code, used for crypto withdrawals when options.tapiVersion is "2"
+ * @param {string} [params.clientOrderId] client request id, only used when options.tapiVersion is "2"
+ * @param {string} [params.bankCode] bank code for an IDR withdrawal when options.tapiVersion is "2"
  * @returns {object} a [transaction structure]{@link https://docs.ccxt.com/?id=transaction-structure}
  */
 func (this *Indodax) Withdraw(code string, amount float64, address string, options ...WithdrawOptions) (Transaction, error) {
@@ -2517,11 +4617,39 @@ func (this *Indodax) Withdraw(code string, amount float64, address string, optio
 
 /**
  * @method
+ * @name indodax#fetchDepositAddress
+ * @description fetch the deposit address for a currency associated with this account
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+ * @param {string} code unified currency code
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
+ * @returns {object} an [address structure]{@link https://docs.ccxt.com/?id=address-structure}
+ */
+func (this *Indodax) FetchDepositAddress(code string, options ...FetchDepositAddressOptions) (DepositAddress, error) {
+
+	opts := FetchDepositAddressOptionsStruct{}
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+	r := <-this.FetchDepositAddressAsync(code, opts.Params)
+	if r.Err != nil {
+		return DepositAddress{}, r.Err
+	}
+	var res DepositAddress = NewDepositAddress(r.Value)
+	return res, nil
+}
+
+/**
+ * @method
  * @name indodax#fetchDepositAddresses
  * @description fetch deposit addresses for multiple currencies and chain types
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
- * @param {string[]} [codes] list of unified currency codes, default is undefined
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+ * @param {string[]} [codes] list of unified currency codes, required when options.tapiVersion is "2"
  * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {string} [params.network] unified network code, only used when options.tapiVersion is "2"
  * @returns {object} a list of [address structures]{@link https://docs.ccxt.com/?id=address-structure}
  */
 func (this *Indodax) FetchDepositAddresses(options ...FetchDepositAddressesOptions) ([]DepositAddress, error) {
@@ -2536,6 +4664,120 @@ func (this *Indodax) FetchDepositAddresses(options ...FetchDepositAddressesOptio
 		return nil, r.Err
 	}
 	var res []DepositAddress = NewDepositAddressArray(r.Value)
+	return res, nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchOrders
+ * @description fetches information on multiple orders made by the user
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#order-history
+ * @param {string} symbol unified market symbol of the market orders were made in
+ * @param {int} [since] the earliest time in ms to fetch orders for
+ * @param {int} [limit] the maximum number of order structures to retrieve
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {int} [params.until] the latest time in ms to fetch orders for
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @returns {Order[]} a list of [order structures]{@link https://docs.ccxt.com/?id=order-structure}
+ */
+func (this *Indodax) FetchOrders(options ...FetchOrdersOptions) ([]Order, error) {
+
+	opts := FetchOrdersOptionsStruct{}
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+	r := <-this.FetchOrdersAsync(opts.Symbol, opts.Since, opts.Limit, opts.Params)
+	if r.Err != nil {
+		return nil, r.Err
+	}
+	var res []Order = NewOrderArray(r.Value)
+	return res, nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchMyTrades
+ * @description fetch all trades made by the user
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#trade-history
+ * @param {string} symbol unified market symbol
+ * @param {int} [since] the earliest time in ms to fetch trades for
+ * @param {int} [limit] the maximum number of trades structures to retrieve
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {int} [params.until] the latest time in ms to fetch trades for
+ * @param {boolean} [params.paginate] true to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so this method requires options.tapiVersion "2"
+ * @returns {Trade[]} a list of [trade structures]{@link https://docs.ccxt.com/?id=trade-structure}
+ */
+func (this *Indodax) FetchMyTrades(options ...FetchMyTradesOptions) ([]Trade, error) {
+
+	opts := FetchMyTradesOptionsStruct{}
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+	r := <-this.FetchMyTradesAsync(opts.Symbol, opts.Since, opts.Limit, opts.Params)
+	if r.Err != nil {
+		return nil, r.Err
+	}
+	var res []Trade = NewTradeArray(r.Value)
+	return res, nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchDeposits
+ * @description fetch all deposits made to an account
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
+ * @param {string} [code] unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
+ * @param {int} [since] the earliest time in ms to fetch deposits for
+ * @param {int} [limit] the maximum number of deposits structures to retrieve
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {int} [params.until] the latest time in ms to fetch deposits for
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
+ * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
+ */
+func (this *Indodax) FetchDeposits(options ...FetchDepositsOptions) ([]Transaction, error) {
+
+	opts := FetchDepositsOptionsStruct{}
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+	r := <-this.FetchDepositsAsync(opts.Code, opts.Since, opts.Limit, opts.Params)
+	if r.Err != nil {
+		return nil, r.Err
+	}
+	var res []Transaction = NewTransactionArray(r.Value)
+	return res, nil
+}
+
+/**
+ * @method
+ * @name indodax#fetchWithdrawals
+ * @description fetch all withdrawals made from an account
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
+ * @see https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
+ * @param {string} [code] unified currency code. Omitting code returns only BTC crypto withdrawals plus IDR fiat withdrawals, because TAPI v2 defaults coin to BTC. Not available when options.tapiVersion is "1"
+ * @param {int} [since] the earliest time in ms to fetch withdrawals for
+ * @param {int} [limit] the maximum number of withdrawals structures to retrieve
+ * @param {object} [params] extra parameters specific to the exchange API endpoint
+ * @param {int} [params.until] the latest time in ms to fetch withdrawals for
+ * @param {boolean} [params.paginate] true to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
+ * @returns {object[]} a list of [transaction structures]{@link https://docs.ccxt.com/?id=transaction-structure}
+ */
+func (this *Indodax) FetchWithdrawals(options ...FetchWithdrawalsOptions) ([]Transaction, error) {
+
+	opts := FetchWithdrawalsOptionsStruct{}
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+	r := <-this.FetchWithdrawalsAsync(opts.Code, opts.Since, opts.Limit, opts.Params)
+	if r.Err != nil {
+		return nil, r.Err
+	}
+	var res []Transaction = NewTransactionArray(r.Value)
 	return res, nil
 }
 
@@ -2640,9 +4882,6 @@ func (this *Indodax) EditLimitOrder(id string, symbol string, side string, amoun
 func (this *Indodax) EditLimitSellOrder(id string, symbol string, amount float64, options ...EditLimitSellOrderOptions) (Order, error) {
 	return this.exchangeTyped.EditLimitSellOrder(id, symbol, amount, options...)
 }
-func (this *Indodax) EditOrder(id string, symbol string, typeVar string, side string, options ...EditOrderOptions) (Order, error) {
-	return this.exchangeTyped.EditOrder(id, symbol, typeVar, side, options...)
-}
 func (this *Indodax) EditOrderWithClientOrderId(clientOrderId string, symbol string, typeVar string, side string, options ...EditOrderWithClientOrderIdOptions) (Order, error) {
 	return this.exchangeTyped.EditOrderWithClientOrderId(clientOrderId, symbol, typeVar, side, options...)
 }
@@ -2688,14 +4927,8 @@ func (this *Indodax) FetchCrossBorrowRates(params ...any) (CrossBorrowRates, err
 func (this *Indodax) FetchCurrencies(params ...any) (Currencies, error) {
 	return this.exchangeTyped.FetchCurrencies(params...)
 }
-func (this *Indodax) FetchDepositAddress(code string, options ...FetchDepositAddressOptions) (DepositAddress, error) {
-	return this.exchangeTyped.FetchDepositAddress(code, options...)
-}
 func (this *Indodax) FetchDepositAddressesByNetwork(code string, options ...FetchDepositAddressesByNetworkOptions) (DepositAddresses, error) {
 	return this.exchangeTyped.FetchDepositAddressesByNetwork(code, options...)
-}
-func (this *Indodax) FetchDeposits(options ...FetchDepositsOptions) ([]Transaction, error) {
-	return this.exchangeTyped.FetchDeposits(options...)
 }
 func (this *Indodax) FetchDepositWithdrawFees(options ...FetchDepositWithdrawFeesOptions) (DepositWithdrawFees, error) {
 	return this.exchangeTyped.FetchDepositWithdrawFees(options...)
@@ -2784,9 +5017,6 @@ func (this *Indodax) FetchMarkPrices(options ...FetchMarkPricesOptions) (Tickers
 func (this *Indodax) FetchMyLiquidations(options ...FetchMyLiquidationsOptions) ([]Liquidation, error) {
 	return this.exchangeTyped.FetchMyLiquidations(options...)
 }
-func (this *Indodax) FetchMyTrades(options ...FetchMyTradesOptions) ([]Trade, error) {
-	return this.exchangeTyped.FetchMyTrades(options...)
-}
 func (this *Indodax) FetchOpenInterest(symbol string, options ...FetchOpenInterestOptions) (OpenInterest, error) {
 	return this.exchangeTyped.FetchOpenInterest(symbol, options...)
 }
@@ -2807,9 +5037,6 @@ func (this *Indodax) FetchOrderWithClientOrderId(clientOrderId string, options .
 }
 func (this *Indodax) FetchOrderBooks(options ...FetchOrderBooksOptions) (OrderBooks, error) {
 	return this.exchangeTyped.FetchOrderBooks(options...)
-}
-func (this *Indodax) FetchOrders(options ...FetchOrdersOptions) ([]Order, error) {
-	return this.exchangeTyped.FetchOrders(options...)
 }
 func (this *Indodax) FetchOrderStatus(id string, options ...FetchOrderStatusOptions) (string, error) {
 	return this.exchangeTyped.FetchOrderStatus(id, options...)
@@ -2850,12 +5077,6 @@ func (this *Indodax) FetchStatus(params ...any) (Status, error) {
 func (this *Indodax) FetchTradingFee(symbol string, options ...FetchTradingFeeOptions) (TradingFeeInterface, error) {
 	return this.exchangeTyped.FetchTradingFee(symbol, options...)
 }
-func (this *Indodax) FetchTradingFees(params ...any) (TradingFees, error) {
-	return this.exchangeTyped.FetchTradingFees(params...)
-}
-func (this *Indodax) FetchTradingLimits(options ...FetchTradingLimitsOptions) (map[string]any, error) {
-	return this.exchangeTyped.FetchTradingLimits(options...)
-}
 func (this *Indodax) FetchTransactionFees(options ...FetchTransactionFeesOptions) (map[string]any, error) {
 	return this.exchangeTyped.FetchTransactionFees(options...)
 }
@@ -2867,9 +5088,6 @@ func (this *Indodax) FetchTransfer(id string, options ...FetchTransferOptions) (
 }
 func (this *Indodax) FetchTransfers(options ...FetchTransfersOptions) ([]TransferEntry, error) {
 	return this.exchangeTyped.FetchTransfers(options...)
-}
-func (this *Indodax) FetchWithdrawals(options ...FetchWithdrawalsOptions) ([]Transaction, error) {
-	return this.exchangeTyped.FetchWithdrawals(options...)
 }
 func (this *Indodax) SetMargin(symbol string, amount float64, options ...SetMarginOptions) (MarginModification, error) {
 	return this.exchangeTyped.SetMargin(symbol, amount, options...)
