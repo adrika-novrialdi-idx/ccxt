@@ -43,6 +43,19 @@
                 "headers": {
                     "X-APIKEY": "key"
                 }
+            },
+            {
+                "description": "TAPI v2 account balances use options.sandboxUrl as the v2 host",
+                "method": "fetchBalance",
+                "url": "https://sandbox.example/api/v2/account?timestamp=1700000000000&recvWindow=5000",
+                "input": [],
+                "options": {
+                    "tapiVersion": "2",
+                    "sandboxUrl": "https://sandbox.example"
+                },
+                "headers": {
+                    "X-APIKEY": "key"
+                }
             }
         ],
         "createOrder": [
