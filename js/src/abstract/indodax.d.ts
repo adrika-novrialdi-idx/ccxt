@@ -25,6 +25,20 @@ interface Exchange {
     privatePostListDownline(params?: {}): Promise<Dict>;
     privatePostCheckDownline(params?: {}): Promise<Dict>;
     privatePostCreateVoucher(params?: {}): Promise<Dict>;
+    deadmanPostCountdownCancelAll(params?: {}): Promise<Dict>;
+    v2GetOrder(params?: {}): Promise<Dict>;
+    v2GetOpenOrders(params?: {}): Promise<List>;
+    v2GetOrderHistories(params?: {}): Promise<Dict>;
+    v2GetMyTrades(params?: {}): Promise<Dict>;
+    v2GetAccount(params?: {}): Promise<Dict>;
+    v2GetCapitalWithdrawHistory(params?: {}): Promise<List>;
+    v2GetCapitalDepositHisrec(params?: {}): Promise<List>;
+    v2GetCapitalDepositAddressList(params?: {}): Promise<List>;
+    v2GetFiatOrders(params?: {}): Promise<Dict>;
+    v2PostOrder(params?: {}): Promise<Dict>;
+    v2PostCapitalWithdrawApply(params?: {}): Promise<Dict>;
+    v2PostFiatWithdraw(params?: {}): Promise<Dict>;
+    v2DeleteOrder(params?: {}): Promise<Dict>;
 }
 declare abstract class Exchange extends _Exchange {
 }

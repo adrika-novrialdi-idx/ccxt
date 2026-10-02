@@ -7,14 +7,21 @@ from ccxt.async_support.base.exchange import Exchange
 from ccxt.abstract.indodax import ImplicitAPI
 import hashlib
 import math
-from ccxt.base.types import Balances, Currency, DepositAddress, Int, Market, Num, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade, DepositWithdrawFee, Transaction
+from ccxt.base.types import Balances, Currency, DepositAddress, Int, Market, Num, Order, OrderBook, OrderSide, OrderType, Str, Strings, Ticker, Tickers, Trade, TradingFees, DepositWithdrawFee, Transaction
 from ccxt.base.errors import ExchangeError
 from ccxt.base.errors import AuthenticationError
 from ccxt.base.errors import ArgumentsRequired
+from ccxt.base.errors import BadRequest
 from ccxt.base.errors import BadSymbol
 from ccxt.base.errors import InsufficientFunds
+from ccxt.base.errors import InvalidAddress
 from ccxt.base.errors import InvalidOrder
 from ccxt.base.errors import OrderNotFound
+from ccxt.base.errors import NotSupported
+from ccxt.base.errors import RateLimitExceeded
+from ccxt.base.errors import ExchangeNotAvailable
+from ccxt.base.errors import OnMaintenance
+from ccxt.base.errors import InvalidNonce
 from ccxt.base.decimal_to_precision import TICK_SIZE
 from ccxt.base.precise import Precise
 
@@ -41,6 +48,7 @@ class indodax(Exchange, ImplicitAPI):
                 'borrowIsolatedMargin': False,
                 'borrowMargin': False,
                 'cancelAllOrders': False,
+                'cancelAllOrdersAfter': True,
                 'cancelOrder': True,
                 'cancelOrders': False,
                 'closeAllPositions': False,
@@ -51,6 +59,8 @@ class indodax(Exchange, ImplicitAPI):
                 'createStopLimitOrder': False,
                 'createStopMarketOrder': False,
                 'createStopOrder': False,
+                'editOrder': False,
+                'fetchAccounts': False,
                 'fetchAllGreeks': False,
                 'fetchBalance': True,
                 'fetchBorrowInterest': False,
@@ -67,13 +77,14 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchDepositAddress': 'emulated',
                 'fetchDepositAddresses': True,
                 'fetchDepositAddressesByNetwork': False,
-                'fetchDeposits': False,
+                'fetchDeposits': True,
                 'fetchDepositsWithdrawals': True,
                 'fetchDepositWithdrawFee': True,
                 'fetchDepositWithdrawFees': False,
                 'fetchFundingHistory': False,
                 'fetchFundingInterval': False,
                 'fetchFundingIntervals': False,
+                'fetchFundingLimits': False,
                 'fetchFundingRate': False,
                 'fetchFundingRateHistory': False,
                 'fetchFundingRates': False,
@@ -82,6 +93,7 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchIsolatedBorrowRate': False,
                 'fetchIsolatedBorrowRates': False,
                 'fetchIsolatedPositions': False,
+                'fetchLedger': False,
                 'fetchLeverage': False,
                 'fetchLeverages': False,
                 'fetchLeverageTiers': False,
@@ -98,6 +110,7 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchMarkPrices': False,
                 'fetchMyLiquidations': False,
                 'fetchMySettlementHistory': False,
+                'fetchMyTrades': True,
                 'fetchOHLCV': True,
                 'fetchOpenInterest': False,
                 'fetchOpenInterestHistory': False,
@@ -107,7 +120,7 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchOptionChain': False,
                 'fetchOrder': True,
                 'fetchOrderBook': True,
-                'fetchOrders': False,
+                'fetchOrders': True,
                 'fetchPosition': False,
                 'fetchPositionForSymbolWs': False,
                 'fetchPositionHistory': False,
@@ -124,7 +137,8 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchTime': True,
                 'fetchTrades': True,
                 'fetchTradingFee': False,
-                'fetchTradingFees': False,
+                'fetchTradingFees': True,
+                'fetchTradingLimits': True,
                 'fetchTransactionFee': True,
                 'fetchTransactionFees': False,
                 'fetchTransactions': 'emulated',
@@ -133,7 +147,7 @@ class indodax(Exchange, ImplicitAPI):
                 'fetchUnderlyingAssets': False,
                 'fetchVolatilityHistory': False,
                 'fetchWithdrawal': False,
-                'fetchWithdrawals': False,
+                'fetchWithdrawals': True,
                 'reduceMargin': False,
                 'repayCrossMargin': False,
                 'repayIsolatedMargin': False,
@@ -150,6 +164,8 @@ class indodax(Exchange, ImplicitAPI):
                 'api': {
                     'public': 'https://indodax.com',
                     'private': 'https://indodax.com/tapi',
+                    'deadman': 'https://indodax.com/tapi',
+                    'v2': 'https://api.indodax.com',
                 },
                 'www': 'https://www.indodax.com',
                 'doc': 'https://github.com/btcid/indodax-official-api-docs',
@@ -188,6 +204,32 @@ class indodax(Exchange, ImplicitAPI):
                         'createVoucher': {'cost': 4},  # partner only
                     },
                 },
+                'deadman': {
+                    'post': {
+                        'countdownCancelAll': {'cost': 20},  # 10 requests / 10 seconds
+                    },
+                },
+                'v2': {
+                    'get': {
+                        'order': {'cost': 4},
+                        'openOrders': {'cost': 4},
+                        'order/histories': {'cost': 4},
+                        'myTrades': {'cost': 4},
+                        'account': {'cost': 4},
+                        'capital/withdraw/history': {'cost': 24},
+                        'capital/deposit/hisrec': {'cost': 24},
+                        'capital/deposit/address/list': {'cost': 24},
+                        'fiat/orders': {'cost': 24},
+                    },
+                    'post': {
+                        'order': {'cost': 4},
+                        'capital/withdraw/apply': {'cost': 24},
+                        'fiat/withdraw': {'cost': 24},
+                    },
+                    'delete': {
+                        'order': {'cost': 4},
+                    },
+                },
             },
             'fees': {
                 'trading': {
@@ -200,14 +242,48 @@ class indodax(Exchange, ImplicitAPI):
             'exceptions': {
                 'exact': {
                     'invalid_pair': BadSymbol,  # {"error":"invalid_pair","error_description":"Invalid Pair"}
+                    'Invalid pair': BadSymbol,
+                    'bad_request': BadRequest,
+                    'Pair is empty': BadRequest,
+                    'Invalid countdown time': BadRequest,
+                    'bad_sign': AuthenticationError,
+                    'sign_not_found': AuthenticationError,
+                    'key_not_found': AuthenticationError,
                     'Insufficient balance.': InsufficientFunds,
                     'invalid order.': OrderNotFound,
                     'Invalid credentials. API not found or session has expired.': AuthenticationError,
                     'Invalid credentials. Bad sign.': AuthenticationError,
+                    '-1121': BadSymbol,
+                    '-2013': OrderNotFound,
+                    '-1021': InvalidNonce,
+                    'invalid_timestamp': InvalidNonce,
+                    '-1022': AuthenticationError,
+                    '-1002': AuthenticationError,
+                    '-2014': AuthenticationError,
+                    '-2015': AuthenticationError,
+                    '-1003': RateLimitExceeded,
+                    '-2010': InvalidOrder,
+                    '-4026': InsufficientFunds,
+                    '-1102': BadRequest,
+                    '-1001': ExchangeNotAvailable,
+                    '-1099': BadRequest,
+                    '-1016': OnMaintenance,
+                    '1109': BadRequest,
+                    '1112': OrderNotFound,
+                    '-1130': InvalidOrder,
+                    '-1111': InvalidOrder,
+                    '-4022': InvalidOrder,
+                    '-4023': InvalidOrder,
+                    '-4033': InvalidAddress,
+                    '-4035': InvalidAddress,
+                    '-4039': BadRequest,
+                    '-4060': InsufficientFunds,
+                    '-4019': InvalidOrder,
                 },
                 'broad': {
                     'Minimum price': InvalidOrder,
                     'Minimum order': InvalidOrder,
+                    'nsufficient balance': InsufficientFunds,
                 },
             },
             'timeframes': {
@@ -222,6 +298,9 @@ class indodax(Exchange, ImplicitAPI):
             },
             # exchange-specific options
             'options': {
+                'tapiVersion': '1',  # '2' opts private calls into TAPI v2; a v1 key cannot call v2
+                'deadmanUrl': None,  # optional replacement for urls.api.private, no trailing path; unset keeps the production tapi host
+                'sandboxUrl': None,  # optional v2 base host with no trailing path; unset keeps urls.api.v2
                 'recvWindow': 5 * 1000,  # default 5 sec
                 'timeDifference': 0,  # the difference between system clock and exchange clock
                 'adjustForTimeDifference': False,  # controls the adjustment logic upon instantiation
@@ -269,7 +348,13 @@ class indodax(Exchange, ImplicitAPI):
                         'iceberg': False,
                     },
                     'createOrders': None,
-                    'fetchMyTrades': None,  # todo implement
+                    'fetchMyTrades': {
+                        'marginMode': False,
+                        'daysBack': 7,
+                        'limit': 1000,
+                        'untilDays': 7,
+                        'symbolRequired': True,
+                    },
                     'fetchOrder': {
                         'marginMode': False,
                         'trigger': False,
@@ -283,7 +368,15 @@ class indodax(Exchange, ImplicitAPI):
                         'trailing': False,
                         'symbolRequired': False,
                     },
-                    'fetchOrders': None,
+                    'fetchOrders': {
+                        'marginMode': False,
+                        'limit': 1000,
+                        'daysBack': 7,
+                        'untilDays': 7,
+                        'trigger': False,
+                        'trailing': False,
+                        'symbolRequired': True,
+                    },
                     'fetchClosedOrders': {
                         'marginMode': False,
                         'limit': 1000,
@@ -320,6 +413,70 @@ class indodax(Exchange, ImplicitAPI):
     def nonce(self) -> float:
         return self.milliseconds() - self.safe_integer(self.options, 'timeDifference', 0)
 
+    def request_timestamp(self) -> str:
+        """
+ @ignore
+        millisecond timestamp for a signed request, as an integer string
+        :returns str: timestamp in milliseconds
+        """
+        timeDifference = self.safe_integer(self.options, 'timeDifference', 0)
+        return self.number_to_string(self.milliseconds() - timeDifference)
+
+    def is_tapi_v2(self) -> bool:
+        """
+ @ignore
+        whether private calls should use TAPI v2
+        :returns boolean: True when options.tapiVersion is "2"
+        """
+        return self.safe_string(self.options, 'tapiVersion', '1') == '2'
+
+    def tapi_v2_symbol(self, market: Market) -> str:
+        """
+ @ignore
+        convert a market to the lowercase TAPI v2 symbol
+        :param dict market: market structure
+        :returns str: exchange symbol such as btcidr
+        """
+        marketId = self.safe_string(market, 'id', '')
+        marketId = marketId.replace('_', '')
+        return marketId.lower()
+
+    def v1_pair_id(self, market: Market) -> str:
+        """
+ @ignore
+        TAPI v1 pair id, which is ticker_id rather than the public pair id
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md
+
+        :param dict market: unified market
+        :returns str: pair id such as btc_idr
+        """
+        info = self.safe_dict(market, 'info', {})
+        tickerId = self.safe_string(info, 'ticker_id')
+        if tickerId is not None:
+            return tickerId
+        return self.safe_string(market, 'id', '')
+
+    def market_from_v1_pair(self, pairId: Str) -> Market:
+        """
+ @ignore
+        find a market for a TAPI v1 pair id such as btc_idr
+        :param str pairId: pair id from an order or the open-orders map
+        :returns dict: a market structure
+        """
+        if (pairId is not None) and (self.markets_by_id is not None) and (pairId in self.markets_by_id):
+            return self.safe_market(pairId)
+        marketList = self.to_array(self.markets)
+        for i in range(0, len(marketList)):
+            entry = marketList[i]
+            info = self.safe_dict(entry, 'info', {})
+            tickerId = self.safe_string(info, 'ticker_id')
+            if (tickerId is not None) and (tickerId == pairId):
+                return entry
+        if (pairId is not None) and (pairId.find('_') >= 0):
+            return self.safe_market(pairId, None, '_')
+        return self.safe_market(pairId)
+
     async def fetch_time(self, params: dict = {}) -> Int:
         """
         fetches the current integer timestamp in milliseconds from the exchange server
@@ -338,16 +495,85 @@ class indodax(Exchange, ImplicitAPI):
         #
         return self.safe_integer(response, 'server_time')
 
+    def pair_price_step(self, market: dict, increment: Str = None) -> Str:
+        """
+ @ignore
+        tick size for a public pair
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+
+        :param dict market: raw pair from GET /api/pairs
+        :param str [increment]: price step from GET /api/price_increments
+        :returns str: tick size
+        """
+        if (increment is not None) and (increment != ''):
+            return increment
+        pricescale = self.safe_string(market, 'pricescale')
+        if pricescale is not None:
+            return pricescale
+        pricePrecision = self.safe_string(market, 'price_precision')
+        if pricePrecision is not None:
+            return pricePrecision
+        return self.parse_precision(self.safe_string(market, 'price_round'))
+
+    def pair_increment(self, market: dict, increments: dict) -> Str:
+        """
+ @ignore
+        price step from GET /api/price_increments for one raw pair
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+
+        :param dict market: raw pair from GET /api/pairs
+        :param dict increments: map from GET /api/price_increments
+        :returns str|None: tick size
+        """
+        tickerId = self.safe_string(market, 'ticker_id')
+        priceStep = self.safe_string(increments, tickerId)
+        if priceStep is None:
+            priceStep = self.safe_string(increments, self.safe_string(market, 'id'))
+        return priceStep
+
+    def parse_public_trading_fee(self, market: dict):
+        """
+ @ignore
+        parse the public pair fee, which is not an account fee tier
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+
+        :param dict market: raw pair from GET /api/pairs
+        :returns dict: a trading fee structure, or None when the pair has no fee fields
+        """
+        takerPercent = self.safe_string_2(market, 'trade_fee_percent_taker', 'trade_fee_percent')
+        makerPercent = self.safe_string_2(market, 'trade_fee_percent_maker', 'trade_fee_percent')
+        if (takerPercent is None) and (makerPercent is None):
+            return None
+        baseId = self.safe_string(market, 'traded_currency')
+        quoteId = self.safe_string(market, 'base_currency')
+        base = self.safe_currency_code(baseId)
+        quote = self.safe_currency_code(quoteId)
+        return {
+            'info': market,
+            'symbol': base + '/' + quote,
+            'percentage': True,
+            'tierBased': False,
+            'maker': self.parse_number(Precise.string_div(makerPercent, '100')),
+            'taker': self.parse_number(Precise.string_div(takerPercent, '100')),
+        }
+
     async def fetch_markets(self, params: dict = {}) -> list[Market]:
         """
         retrieves data on all markets for indodax
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
 
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :returns dict[]: an array of objects representing market data
         """
         response = await self.publicGetApiPairs(params)
+        incrementsResponse = await self.publicGetApiPriceIncrements(params)
+        increments = self.safe_dict(incrementsResponse, 'increments', {})
         #
         #     [
         #         {
@@ -362,12 +588,15 @@ class indodax(Exchange, ImplicitAPI):
         #             "price_precision": 1000,
         #             "price_round": 8,
         #             "pricescale": 1000,
+        #             "quantity_increment": "0.00000001",
         #             "trade_min_base_currency": 10000,
         #             "trade_min_traded_currency": 0.00007457,
         #             "has_memo": false,
         #             "memo_name": false,
         #             "has_payment_id": false,
         #             "trade_fee_percent": 0.3,
+        #             "trade_fee_percent_maker": 0.1,
+        #             "trade_fee_percent_taker": 0.2,
         #             "url_logo": "https://indodax.com/v2/logo/svg/color/btc.svg",
         #             "url_logo_png": "https://indodax.com/v2/logo/png/color/btc.png",
         #             "is_maintenance": 0
@@ -387,6 +616,17 @@ class indodax(Exchange, ImplicitAPI):
                 continue
             isMaintenance = self.safe_integer(market, 'is_maintenance')
             inMaintenance = (isMaintenance is not None) and (isMaintenance != 0)
+            active = True
+            if inMaintenance:
+                active = False
+            fee = self.parse_public_trading_fee(market)
+            taker = None
+            maker = None
+            if fee is not None:
+                taker = fee['taker']
+                maker = fee['maker']
+            amountStep = self.safe_string(market, 'quantity_increment', '0.00000001')
+            priceStep = self.pair_increment(market, increments)
             result.append({
                 'id': id,
                 'symbol': base + '/' + quote,
@@ -402,20 +642,22 @@ class indodax(Exchange, ImplicitAPI):
                 'swap': False,
                 'future': False,
                 'option': False,
-                'active': False if inMaintenance else True,
+                'active': active,
                 'contract': False,
                 'linear': None,
                 'inverse': None,
-                'taker': self.safe_number(market, 'trade_fee_percent'),
+                'taker': taker,
+                'maker': maker,
                 'contractSize': None,
                 'expiry': None,
                 'expiryDatetime': None,
                 'strike': None,
                 'optionType': None,
                 'percentage': True,
+                'tierBased': False,
                 'precision': {
-                    'amount': self.parse_number('1e-8'),
-                    'price': self.parse_number(self.parse_precision(self.safe_string(market, 'price_round'))),
+                    'amount': self.parse_number(amountStep),
+                    'price': self.parse_number(self.pair_price_step(market, priceStep)),
                     'cost': self.parse_number(self.parse_precision(self.safe_string(market, 'volume_precision'))),
                 },
                 'limits': {
@@ -428,11 +670,11 @@ class indodax(Exchange, ImplicitAPI):
                         'max': None,
                     },
                     'price': {
-                        'min': self.safe_number(market, 'trade_min_base_currency'),
+                        'min': None,
                         'max': None,
                     },
                     'cost': {
-                        'min': None,
+                        'min': self.safe_number(market, 'trade_min_base_currency'),
                         'max': None,
                     },
                 },
@@ -440,6 +682,91 @@ class indodax(Exchange, ImplicitAPI):
                 'info': market,
             })
         return result
+
+    async def fetch_trading_fees(self, params: dict = {}) -> TradingFees:
+        """
+        fetch the public trading fees for multiple markets
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `fee structures <https://docs.ccxt.com/?id=trading-fee-structure>` indexed by market symbols
+        """
+        response = await self.publicGetApiPairs(params)
+        rawMarkets = self.to_array(response)
+        result = {}
+        for i in range(0, len(rawMarkets)):
+            fee = self.parse_public_trading_fee(rawMarkets[i])
+            if fee is not None:
+                symbol = self.safe_string(fee, 'symbol')
+                if symbol is not None:
+                    result[symbol] = fee
+        return result
+
+    async def fetch_trading_limits(self, symbols: Strings = None, params: dict = {}) -> dict:
+        """
+        fetch the public trading limits and price steps for markets
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#pairs
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Public-RestAPI.md#price-increments
+
+        :param str[]|None symbols: unified market symbols
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a dictionary of `trading limits structures <https://docs.ccxt.com/?id=trading-limits-structure>` indexed by market symbol
+        """
+        response = await self.publicGetApiPairs(params)
+        incrementsResponse = await self.publicGetApiPriceIncrements(params)
+        increments = self.safe_dict(incrementsResponse, 'increments', {})
+        rawMarkets = self.to_array(response)
+        result = {}
+        for i in range(0, len(rawMarkets)):
+            market = rawMarkets[i]
+            baseId = self.safe_string(market, 'traded_currency')
+            quoteId = self.safe_string(market, 'base_currency')
+            base = self.safe_currency_code(baseId)
+            quote = self.safe_currency_code(quoteId)
+            symbol = base + '/' + quote
+            if symbols is not None:
+                if not self.in_array(symbol, symbols):
+                    continue
+            priceStep = self.pair_increment(market, increments)
+            amountStep = self.safe_string(market, 'quantity_increment')
+            result[symbol] = {
+                'info': market,
+                'precision': {
+                    'amount': self.parse_number(amountStep),
+                    'price': self.parse_number(self.pair_price_step(market, priceStep)),
+                },
+                'limits': {
+                    'amount': {
+                        'min': self.safe_number(market, 'trade_min_traded_currency'),
+                        'max': None,
+                    },
+                    'price': {
+                        'min': None,
+                        'max': None,
+                    },
+                    'cost': {
+                        'min': self.safe_number(market, 'trade_min_base_currency'),
+                        'max': None,
+                    },
+                },
+            }
+        return result
+
+    async def edit_order(self, id: str, symbol: str, type: OrderType, side: OrderSide, amount: Num = None, price: Num = None, params: dict = {}) -> Order:
+        """
+        edit a trade order
+        :param str id: order id
+        :param str symbol: unified symbol of the market to edit an order in
+        :param str type: 'market' or 'limit'
+        :param str side: 'buy' or 'sell'
+        :param float [amount]: how much of the currency you want to trade in units of the base currency
+        :param float [price]: the price at which the order is to be fulfilled, in units of the quote currency
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: an `order structure <https://docs.ccxt.com/?id=order-structure>`
+        """
+        raise NotSupported(self.id + ' editOrder() is not supported yet')
 
     def parse_balance(self, response: object) -> Balances:
         balances = self.safe_dict(response, 'return', {})
@@ -467,10 +794,14 @@ class indodax(Exchange, ImplicitAPI):
         query for balance and get the amount of funds available for trading or funds locked in orders
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#get-info-endpoint
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-account-information
 
         :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param boolean [params.omitZeroBalances]: True to omit zero balances, only used when options.tapiVersion is "2"
         :returns dict: a `balance structure <https://docs.ccxt.com/?id=balance-structure>`
         """
+        if self.is_tapi_v2():
+            return await self.balance_v2(params)
         if self.markets is None:
             await self.load_markets()
         response = await self.privatePostGetInfo(params)
@@ -643,6 +974,9 @@ class indodax(Exchange, ImplicitAPI):
         return self.filter_by_array(parsedTickers, 'symbol', symbols)
 
     def parse_trade(self, trade: dict, market: Market = None) -> Trade:
+        if 'tradeId' in trade:
+            # copy so Java and Go accept this return; parseV2Trade already built the trade
+            return self.extend(self.parse_v2_trade(trade, market), {})
         timestamp = self.safe_timestamp(trade, 'date')
         return self.safe_trade({
             'id': self.safe_string(trade, 'tid'),
@@ -750,10 +1084,20 @@ class indodax(Exchange, ImplicitAPI):
             'open': 'open',
             'filled': 'closed',
             'cancelled': 'canceled',
+            'NEW': 'open',
+            'PARTIALLY_FILLED': 'open',
+            'FILLED': 'closed',
+            'CANCELLED': 'canceled',
+            'CANCELED': 'canceled',
+            'REJECTED': 'rejected',
+            'EXPIRED': 'expired',
         }
         return self.safe_string(statuses, status, status)
 
     def parse_order(self, order: dict, market: Market = None) -> Order:
+        if ('origQty' in order) or ('oriQty' in order) or ('fullOrderId' in order) or ('executedQty' in order):
+            # copy so Java and Go accept this return; parseV2Order already built the order
+            return self.extend(self.parse_v2_order(order, market), {})
         #
         #     {
         #         "order_id": "12345",
@@ -809,18 +1153,33 @@ class indodax(Exchange, ImplicitAPI):
         marketResolved = self.safe_market(marketId, market)
         if marketResolved is not None:
             symbol = marketResolved['symbol']
-            quoteId = marketResolved['quoteId']
-            baseId = marketResolved['baseId']
-            if (marketResolved['quoteId'] == 'idr') and ('order_rp' in order):
+            quoteId = self.safe_string(marketResolved, 'quoteId')
+            baseId = self.safe_string(marketResolved, 'baseId')
+            if (quoteId is None) or (baseId is None):
+                resolved = self.market_from_v1_pair(marketId)
+                resolvedQuoteId = self.safe_string(resolved, 'quoteId')
+                resolvedBaseId = self.safe_string(resolved, 'baseId')
+                if resolvedQuoteId is not None:
+                    quoteId = resolvedQuoteId
+                    symbol = self.safe_string(resolved, 'symbol', symbol)
+                if resolvedBaseId is not None:
+                    baseId = resolvedBaseId
+            if (quoteId == 'idr') and ('order_rp' in order):
                 quoteId = 'rp'
-            if (marketResolved['baseId'] == 'idr') and ('remain_rp' in order):
+            if (baseId == 'idr') and ('remain_rp' in order):
                 baseId = 'rp'
-            cost = self.safe_string(order, 'order_' + quoteId)
-            amount = self.safe_string(order, 'order_' + baseId)
-            remaining = self.safe_string(order, 'remain_' + baseId)
-            # filled buy orders on idr-quoted markets carry the executed base amount
-            # only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
-            filled = self.safe_string(order, 'receive_' + baseId)
+            if quoteId is not None:
+                costKey = 'order_' + quoteId
+                cost = self.safe_string(order, costKey)
+            if baseId is not None:
+                amountKey = 'order_' + baseId
+                remainKey = 'remain_' + baseId
+                filledKey = 'receive_' + baseId
+                amount = self.safe_string(order, amountKey)
+                remaining = self.safe_string(order, remainKey)
+                # filled buy orders on idr-quoted markets carry the executed base amount
+                # only in a dynamic receive_{base} field, https://github.com/ccxt/ccxt/issues/26413
+                filled = self.safe_string(order, filledKey)
         timestamp = self.safe_integer(order, 'submit_time')
         fee = None
         id = self.safe_string(order, 'order_id')
@@ -853,19 +1212,30 @@ class indodax(Exchange, ImplicitAPI):
         fetches information on an order made by the user
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#get-order-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-order
 
         :param str id: order id
         :param str symbol: unified symbol of the market the order was made in
         :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.clientOrderId]: client order id, only used when options.tapiVersion is "2"
         :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
         """
+        if self.is_tapi_v2():
+            if self.markets is None:
+                await self.load_markets()
+            orderRequest = self.v2_order_request(id, symbol, params)
+            v2Market = self.market(symbol)
+            v2Request = orderRequest[1]
+            paramsRest = orderRequest[2]
+            v2Response = await self.v2GetOrder(self.extend(v2Request, paramsRest))
+            return self.parse_order(v2Response, v2Market)
         if symbol is None:
             raise ArgumentsRequired(self.id + ' fetchOrder() requires a symbol argument')
         if self.markets is None:
             await self.load_markets()
         market = self.market(symbol)
         request = {
-            'pair': market['id'],
+            'pair': self.v1_pair_id(market),
             'order_id': id,
         }
         response = await self.privatePostGetOrder(self.extend(request, params))
@@ -879,6 +1249,7 @@ class indodax(Exchange, ImplicitAPI):
         fetch all unfilled currently open orders
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#open-orders-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#pending-order
 
         :param str symbol: unified market symbol
         :param int [since]: the earliest time in ms to fetch open orders for
@@ -886,13 +1257,15 @@ class indodax(Exchange, ImplicitAPI):
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
         """
+        if self.is_tapi_v2():
+            return await self.open_orders_v2(symbol, since, limit, params)
         if self.markets is None:
             await self.load_markets()
         market = None
         request = {}
         if symbol is not None:
             market = self.market(symbol)
-            request['pair'] = market['id']
+            request['pair'] = self.v1_pair_id(market)
         response = await self.privatePostOpenOrders(self.extend(request, params))
         openOrdersResult = self.safe_dict(response, 'return', {})
         rawOrders = openOrdersResult['orders']
@@ -908,7 +1281,8 @@ class indodax(Exchange, ImplicitAPI):
         for i in range(0, len(marketIds)):
             marketId = marketIds[i]
             marketOrders = rawOrders[marketId]
-            market = self.safe_market(marketId)
+            pairMarketId = self.safe_string(self.market_from_v1_pair(marketId), 'id', marketId)
+            market = self.safe_market(pairMarketId, None, '_')
             parsedOrders = self.parse_orders(marketOrders, market, since, limit)
             exchangeOrders = self.array_concat(exchangeOrders, parsedOrders)
         return exchangeOrders
@@ -918,6 +1292,7 @@ class indodax(Exchange, ImplicitAPI):
         fetches information on multiple closed orders made by the user
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#order-history
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#order-history
 
         :param str symbol: unified market symbol of the market orders were made in
         :param int [since]: the earliest time in ms to fetch orders for
@@ -925,13 +1300,16 @@ class indodax(Exchange, ImplicitAPI):
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
         """
+        if self.is_tapi_v2():
+            closedOrders = await self.fetch_orders(symbol, since, limit, params)
+            return self.filter_by(closedOrders, 'status', 'closed')
         if symbol is None:
             raise ArgumentsRequired(self.id + ' fetchClosedOrders() requires a symbol argument')
         if self.markets is None:
             await self.load_markets()
         market = self.market(symbol)
         request = {
-            'pair': market['id'],
+            'pair': self.v1_pair_id(market),
         }
         response = await self.privatePostOrderHistory(self.extend(request, params))
         historyResult = self.safe_dict(response, 'return', {})
@@ -944,6 +1322,7 @@ class indodax(Exchange, ImplicitAPI):
         create a trade order
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#trade-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#create-order
 
         :param str symbol: unified symbol of the market to create an order in
         :param str type: 'market' or 'limit'
@@ -951,22 +1330,67 @@ class indodax(Exchange, ImplicitAPI):
         :param float amount: how much of currency you want to trade in units of base currency
         :param float [price]: the price at which the order is to be fulfilled, in units of the quote currency, ignored in market orders
         :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param float [params.cost]: quote amount to spend on a market buy, only used when options.tapiVersion is "2"
+        :param str [params.clientOrderId]: client order id, only used when options.tapiVersion is "2"
+        :param str [params.timeInForce]: GTC or MOC, only used when options.tapiVersion is "2"
+        :param str [params.selfTradePreventionMode]: EXPIRE_TAKER, EXPIRE_MAKER, or EXPIRE_BOTH, only used when options.tapiVersion is "2"
         :returns dict: an `order structure <https://docs.ccxt.com/?id=order-structure>`
         """
+        if self.is_tapi_v2():
+            if self.markets is None:
+                await self.load_markets()
+            v2Market = self.market(symbol)
+            if side is None:
+                raise ArgumentsRequired(self.id + ' createOrder() requires a side argument')
+            clientOrderId = self.safe_string(params, 'clientOrderId')
+            timeInForce = self.safe_string(params, 'timeInForce')
+            selfTradePreventionMode = self.safe_string(params, 'selfTradePreventionMode')
+            cost = self.safe_string(params, 'cost')
+            paramsOmitted = self.omit(params, ['clientOrderId', 'timeInForce', 'selfTradePreventionMode', 'cost'])
+            v2Request = {
+                'symbol': self.tapi_v2_symbol(v2Market),
+                'side': side.upper(),
+                'type': type.upper(),
+            }
+            if type == 'market':
+                if side == 'buy':
+                    quoteAmount = None
+                    if cost is not None:
+                        quoteAmount = self.cost_to_precision(symbol, cost)
+                    else:
+                        if price is None:
+                            raise InvalidOrder(self.id + ' createOrder() requires the price argument or params.cost for market buy orders')
+                        amountString = self.number_to_string(amount)
+                        priceString = self.number_to_string(price)
+                        quoteAmount = self.cost_to_precision(symbol, Precise.string_mul(amountString, priceString))
+                    v2Request['quoteOrderQty'] = quoteAmount
+                else:
+                    v2Request['quantity'] = self.amount_to_precision(symbol, amount)
+            elif type == 'limit':
+                if price is None:
+                    raise InvalidOrder(self.id + ' createOrder() requires a price argument for a limit order')
+                v2Request['price'] = self.price_to_precision(symbol, price)
+                v2Request['quantity'] = self.amount_to_precision(symbol, amount)
+                if timeInForce is not None:
+                    v2Request['timeInForce'] = timeInForce
+            else:
+                raise InvalidOrder(self.id + ' createOrder() does not support order type ' + type)
+            if clientOrderId is not None:
+                v2Request['newClientOrderId'] = clientOrderId
+            if selfTradePreventionMode is not None:
+                v2Request['selfTradePreventionMode'] = selfTradePreventionMode
+            v2Response = await self.v2PostOrder(self.extend(v2Request, paramsOmitted))
+            return self.parse_order(v2Response, v2Market)
         if self.markets is None:
             await self.load_markets()
         market = self.market(symbol)
         request = {
-            'pair': market['id'],
+            'pair': self.v1_pair_id(market),
             'type': side,
             'price': price,
         }
         priceIsRequired = False
         quantityIsRequired = False
-        isMarketBuy = (type == 'market') and (side == 'buy')
-        paramsOmitted = params
-        if isMarketBuy:
-            paramsOmitted = self.omit(params, 'cost')
         if type == 'market':
             if side == 'buy':
                 quoteAmount = None
@@ -994,7 +1418,8 @@ class indodax(Exchange, ImplicitAPI):
             request['price'] = price
         if quantityIsRequired:
             request[market['baseId']] = self.amount_to_precision(symbol, amount)
-        result = await self.privatePostTrade(self.extend(request, paramsOmitted))
+        tradeParams = self.omit(params, 'cost') if (type == 'market' and side == 'buy') else params
+        result = await self.privatePostTrade(self.extend(request, tradeParams))
         data = self.safe_dict(result, 'return', {})
         id = self.safe_string(data, 'order_id')
         return self.safe_order({
@@ -1007,12 +1432,24 @@ class indodax(Exchange, ImplicitAPI):
         cancels an open order
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#cancel-order-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#cancel-order
 
         :param str id: order id
         :param str symbol: unified symbol of the market the order was made in
         :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.side]: order side, required on TAPI v1 and not used when options.tapiVersion is "2"
+        :param str [params.clientOrderId]: client order id, only used when options.tapiVersion is "2"
         :returns dict: An `order structure <https://docs.ccxt.com/?id=order-structure>`
         """
+        if self.is_tapi_v2():
+            if self.markets is None:
+                await self.load_markets()
+            orderRequest = self.v2_order_request(id, symbol, params)
+            v2Market = self.market(symbol)
+            v2Request = orderRequest[1]
+            paramsRest = orderRequest[2]
+            v2Response = await self.v2DeleteOrder(self.extend(v2Request, paramsRest))
+            return self.parse_order(v2Response, v2Market)
         if symbol is None:
             raise ArgumentsRequired(self.id + ' cancelOrder() requires a symbol argument')
         side = self.safe_string(params, 'side')
@@ -1023,7 +1460,7 @@ class indodax(Exchange, ImplicitAPI):
         market = self.market(symbol)
         request = {
             'order_id': id,
-            'pair': market['id'],
+            'pair': self.v1_pair_id(market),
             'type': side,
         }
         response = await self.privatePostCancelOrder(self.extend(request, params))
@@ -1049,6 +1486,53 @@ class indodax(Exchange, ImplicitAPI):
         data = self.safe_dict(response, 'return')
         return self.parse_order(data)
 
+    async def cancel_all_orders_after(self, timeout: Int, params: dict = {}) -> dict:
+        """
+        dead man's switch, cancel all orders after a countdown in milliseconds, and 0 stops the timer. options.deadmanUrl replaces the tapi base and has no trailing path
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Deadman-switch.md
+
+        :param number timeout: time in milliseconds, 0 represents cancel the timer
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.symbol]: unified market symbol
+        :param str[] [params.symbols]: list of unified market symbols, joined into one pair list
+        :returns dict: the raw api response
+        """
+        if timeout is None:
+            raise ArgumentsRequired(self.id + ' cancelAllOrdersAfter() requires a timeout argument')
+        if self.markets is None:
+            await self.load_markets()
+        symbol = self.safe_string(params, 'symbol')
+        symbols = self.safe_list(params, 'symbols')
+        pair = None
+        if symbols is not None:
+            symbolsLength = len(symbols)
+            if symbolsLength < 1:
+                raise ArgumentsRequired(self.id + ' cancelAllOrdersAfter() requires a symbol or symbols argument in params')
+            pairIds = []
+            for i in range(0, symbolsLength):
+                marketSymbol = symbols[i]
+                market = self.market(marketSymbol)
+                pairIds.append(self.v1_pair_id(market))
+            pair = ','.join(pairIds)
+        elif symbol is not None:
+            market = self.market(symbol)
+            pair = self.v1_pair_id(market)
+        else:
+            raise ArgumentsRequired(self.id + ' cancelAllOrdersAfter() requires a symbol or symbols argument in params')
+        paramsOmitted = self.omit(params, ['symbol', 'symbols'])
+        request = {
+            'pair': pair,
+            'countdownTime': timeout,
+        }
+        response = await self.deadmanPostCountdownCancelAll(self.extend(request, paramsOmitted))
+        #
+        #     {
+        #         "success": 1
+        #     }
+        #
+        return self.extend(response, {})
+
     async def fetch_transaction_fee(self, code: str, params: dict = {}):
         """
         fetch the fee for a transaction
@@ -1059,6 +1543,8 @@ class indodax(Exchange, ImplicitAPI):
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :returns dict: a `fee structure <https://docs.ccxt.com/?id=fee-structure>`
         """
+        if self.is_tapi_v2():
+            raise NotSupported(self.id + ' fetchTransactionFee() is not available when options.tapiVersion is "2"')
         if self.markets is None:
             await self.load_markets()
         currency = self.currency(code)
@@ -1094,6 +1580,8 @@ class indodax(Exchange, ImplicitAPI):
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :returns dict: a `fee structure <https://docs.ccxt.com/?id=fee-structure>`
         """
+        if self.is_tapi_v2():
+            raise NotSupported(self.id + ' fetchDepositWithdrawFee() is not available when options.tapiVersion is "2"')
         await self.load_markets()
         currency = self.currency(code)
         request = {
@@ -1123,13 +1611,19 @@ class indodax(Exchange, ImplicitAPI):
         fetch history of deposits and withdrawals
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#transaction-history-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
 
-        :param str [code]: unified currency code for the currency of the deposit/withdrawals, default is None
+        :param str [code]: unified currency code. On TAPI v2, omitting code returns only BTC crypto history plus IDR fiat history, because the exchange defaults coin to BTC
         :param int [since]: timestamp in ms of the earliest deposit/withdrawal, default is None
         :param int [limit]: max number of deposit/withdrawals to return, default is None
         :param dict [params]: extra parameters specific to the exchange API endpoint
         :returns dict: a list of `transaction structure <https://docs.ccxt.com/?id=transaction-structure>`
         """
+        if self.is_tapi_v2():
+            deposits = await self.fetch_deposits(code, since, limit, params)
+            withdrawals = await self.fetch_withdrawals(code, since, limit, params)
+            merged = self.array_concat(deposits, withdrawals)
+            return self.filter_by_since_limit(merged, since, limit, 'timestamp')
         if self.markets is None:
             await self.load_markets()
         request = {}
@@ -1221,15 +1715,25 @@ class indodax(Exchange, ImplicitAPI):
         make a withdrawal
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#withdraw-coin-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#withdraw-coin
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#withdraw-idr
 
         :param str code: unified currency code
         :param float amount: the amount to withdraw
         :param str address: the address to withdraw to
         :param str tag:
         :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.network]: unified network code, used for crypto withdrawals when options.tapiVersion is "2"
+        :param str [params.clientOrderId]: client request id, only used when options.tapiVersion is "2"
+        :param str [params.bankCode]: bank code for an IDR withdrawal when options.tapiVersion is "2"
         :returns dict: a `transaction structure <https://docs.ccxt.com/?id=transaction-structure>`
         """
-        tagWithdrawTag, paramsWithdrawTag = self.handle_withdraw_tag_and_params(tag, params)
+        if self.is_tapi_v2():
+            withdrawal = await self.send_withdraw_v2(code, amount, address, tag, params)
+            return self.extend(withdrawal, {})
+        withdrawTag = self.handle_withdraw_tag_and_params(tag, params)
+        tagWithdrawTag = withdrawTag[0]
+        paramsWithdrawTag = withdrawTag[1]
         self.check_address(address)
         if self.markets is None:
             await self.load_markets()
@@ -1268,6 +1772,9 @@ class indodax(Exchange, ImplicitAPI):
         return self.parse_transaction(response, currency)
 
     def parse_transaction(self, transaction: dict, currency: Currency = None) -> Transaction:
+        if ('coin' in transaction) or ('fiatCurrency' in transaction) or ('withdrawStatus' in transaction) or ('depositStatus' in transaction) or ('txType' in transaction):
+            # copy so Go accepts this return; parseV2Transaction already built the transaction
+            return self.extend(self.parse_v2_transaction(transaction, currency), {})
         #
         # withdraw
         #
@@ -1346,19 +1853,78 @@ class indodax(Exchange, ImplicitAPI):
     def parse_transaction_status(self, status: Str):
         statuses = {
             'success': 'ok',
+            'pending': 'pending',
+            'failed': 'failed',
         }
         return self.safe_string(statuses, status, status)
+
+    def v1_deposit_network(self, networks: dict, currencyId: str, code: Str):
+        """
+ @ignore
+        parse a getInfo network value, which may be a string, a comma-separated string, a list, or empty
+        :param dict networks: network map from getInfo
+        :param str currencyId: currency id key
+        :param str code: unified currency code
+        :returns str[]: unified network codes, one per network
+        """
+        networkList = self.safe_list(networks, currencyId)
+        networkIds = []
+        if networkList is not None:
+            for i in range(0, len(networkList)):
+                networkId = self.safe_string(networkList, i)
+                if networkId is not None:
+                    networkIds.append(networkId)
+        else:
+            networkId = self.safe_string(networks, currencyId)
+            if networkId is not None:
+                if networkId.find(',') >= 0:
+                    parts = networkId.split(',')
+                    for j in range(0, len(parts)):
+                        networkIds.append(parts[j])
+                else:
+                    networkIds.append(networkId)
+        parsed = []
+        for i in range(0, len(networkIds)):
+            networkCode = self.network_id_to_code(networkIds[i], code)
+            if networkCode is not None:
+                parsed.append(networkCode.upper())
+        return parsed
+
+    async def fetch_deposit_address(self, code: str, params: dict = {}) -> DepositAddress:
+        """
+        fetch the deposit address for a currency associated with self account
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
+
+        :param str code: unified currency code
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.network]: unified network code, only used when options.tapiVersion is "2"
+        :returns dict: an `address structure <https://docs.ccxt.com/?id=address-structure>`
+        """
+        addresses = await self.fetch_deposit_addresses([code], params)
+        rows = self.to_array(addresses)
+        for i in range(0, len(rows)):
+            row = rows[i]
+            rowCode = self.safe_string(row, 'currency')
+            if rowCode == code:
+                return row
+        raise InvalidAddress(self.id + ' fetchDepositAddress() could not find a deposit address for ' + code + ', make sure you have created a corresponding deposit address in your wallet on the exchange website')
 
     async def fetch_deposit_addresses(self, codes: Strings = None, params: dict = {}) -> list[DepositAddress]:
         """
         fetch deposit addresses for multiple currencies and chain types
 
         https://github.com/btcid/indodax-official-api-docs/blob/master/Private-RestAPI.md#general-information-on-endpoints
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#list-deposit-address
 
-        :param str[] [codes]: list of unified currency codes, default is None
+        :param str[] [codes]: list of unified currency codes, required when options.tapiVersion is "2"
         :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param str [params.network]: unified network code, only used when options.tapiVersion is "2"
         :returns dict: a list of `address structures <https://docs.ccxt.com/?id=address-structure>`
         """
+        if self.is_tapi_v2():
+            return await self.deposit_addresses_v2(codes, params)
         if self.markets is None:
             await self.load_markets()
         response = await self.privatePostGetInfo(params)
@@ -1401,77 +1967,785 @@ class indodax(Exchange, ImplicitAPI):
         addresses = self.safe_dict(data, 'address', {})
         networks = self.safe_dict(data, 'network', {})
         addressKeys = list(addresses.keys())
-        result = {
-            'info': data,
-        }
+        result = []
         for i in range(0, len(addressKeys)):
             marketId = addressKeys[i]
             code = self.safe_currency_code(marketId)
             address = self.safe_string(addresses, marketId)
             if (address is not None) and ((codes is None) or (self.in_array(code, codes))):
                 self.check_address(address)
-                network = None
-                if marketId in networks:
-                    networkId = self.safe_string(networks, marketId)
-                    if networkId is None:
-                        raise ExchangeError(self.id + ' fetchDepositAddresses() missing networkId')
-                    if networkId.find(',') >= 0:
-                        network = []
-                        if networkId is None:
-                            raise ExchangeError(self.id + ' fetchDepositAddresses() missing networkId')
-                        networkIds = networkId.split(',')
-                        for j in range(0, len(networkIds)):
-                            _netIdTmp = self.network_id_to_code(networkIds[j], code)
-                            if _netIdTmp is not None:
-                                network.append(_netIdTmp.upper())
-                    else:
-                        _netIdTmp = self.network_id_to_code(networkId, code)
-                        if _netIdTmp is not None:
-                            network = _netIdTmp.upper()
-                finalNetwork = network  # java req
+                networkCodes = self.v1_deposit_network(networks, marketId, code)
+                networkCount = len(networkCodes)
                 if code is not None:
-                    result[code] = {
-                        'info': {},
-                        'currency': code,
-                        'network': finalNetwork,
-                        'address': address,
-                        'tag': None,
-                    }
+                    if networkCount < 1:
+                        result.append({
+                            'info': {},
+                            'currency': code,
+                            'network': None,
+                            'address': address,
+                            'tag': None,
+                        })
+                    else:
+                        for n in range(0, networkCount):
+                            networkCode = networkCodes[n]
+                            result.append({
+                                'info': {},
+                                'currency': code,
+                                'network': networkCode,
+                                'address': address,
+                                'tag': None,
+                            })
         return result
+
+    async def balance_v2(self, params: dict = {}) -> Balances:
+        """
+ @ignore
+        query account balances on TAPI v2
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-account-information
+
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :returns dict: a balance structure
+        """
+        if self.markets is None:
+            await self.load_markets()
+        request = {}
+        omitZeroBalances = self.safe_bool(params, 'omitZeroBalances')
+        paramsOmitted = self.omit(params, ['omitZeroBalances'])
+        if omitZeroBalances is not None:
+            request['omitZeroBalances'] = omitZeroBalances
+        response = await self.v2GetAccount(self.extend(request, paramsOmitted))
+        return self.parse_balance_v2(response)
+
+    def parse_balance_v2(self, response: dict) -> Balances:
+        """
+ @ignore
+        :param dict response: account response
+        :returns dict: a balance structure
+        """
+        balances = self.safe_list(response, 'balances', [])
+        result = {
+            'info': response,
+        }
+        for i in range(0, len(balances)):
+            entry = balances[i]
+            currencyId = self.safe_string(entry, 'asset')
+            code = self.safe_currency_code(currencyId)
+            account = self.account()
+            account['free'] = self.safe_string(entry, 'free')
+            account['used'] = self.safe_string(entry, 'locked')
+            if code is not None:
+                result[code] = account
+        return self.safe_balance(result)
+
+    def parse_v2_order(self, order: dict, market: Market = None) -> Order:
+        """
+ @ignore
+        :param dict order: raw order
+        :param dict [market]: market structure
+        :returns dict: an order structure
+        """
+        marketId = self.safe_string_lower(order, 'symbol')
+        marketResolved = self.safe_market(marketId, market)
+        rawStatus = self.safe_string(order, 'status')
+        status = None
+        if rawStatus is not None:
+            status = self.parse_order_status(rawStatus)
+        timestamp = self.safe_integer_2(order, 'time', 'submitTime')
+        amount = self.safe_string_2(order, 'origQty', 'oriQty')
+        filled = self.safe_string(order, 'executedQty')
+        remaining = None
+        if (amount is not None) and (filled is not None):
+            remaining = Precise.string_sub(amount, filled)
+        return {
+            'info': order,
+            'id': self.safe_string_2(order, 'fullOrderId', 'orderId'),
+            'clientOrderId': self.safe_string_2(order, 'clientOrderId', 'origClientOrderId'),
+            'timestamp': timestamp,
+            'datetime': self.iso8601(timestamp),
+            'lastTradeTimestamp': self.safe_integer(order, 'finishTime'),
+            'symbol': self.safe_symbol(marketId, marketResolved),
+            'type': self.safe_string_lower(order, 'type'),
+            'timeInForce': self.safe_string(order, 'timeInForce'),
+            'postOnly': None,
+            'side': self.safe_string_lower(order, 'side'),
+            'price': self.parse_number(self.safe_string(order, 'price')),
+            'triggerPrice': None,
+            'cost': None,
+            'average': None,
+            'amount': self.parse_number(amount),
+            'filled': self.parse_number(filled),
+            'remaining': self.parse_number(remaining),
+            'status': status,
+            'fee': None,
+            'trades': [],
+            'fees': [],
+            'lastUpdateTimestamp': None,
+            'reduceOnly': None,
+            'stopPrice': None,
+            'takeProfitPrice': None,
+            'stopLossPrice': None,
+        }
+
+    def parse_v2_trade(self, trade: dict, market: Market = None) -> Trade:
+        """
+ @ignore
+        :param dict trade: raw trade
+        :param dict [market]: market structure
+        :returns dict: a trade structure
+        """
+        marketId = self.safe_string_lower(trade, 'symbol')
+        marketResolved = self.safe_market(marketId, market)
+        timestamp = self.safe_integer(trade, 'time')
+        isBuyer = self.safe_bool(trade, 'isBuyer')
+        side = None
+        if isBuyer is True:
+            side = 'buy'
+        elif isBuyer is False:
+            side = 'sell'
+        isMaker = self.safe_bool(trade, 'isMaker')
+        takerOrMaker = None
+        if isMaker is True:
+            takerOrMaker = 'maker'
+        elif isMaker is False:
+            takerOrMaker = 'taker'
+        feeCost = self.safe_string(trade, 'commission')
+        fee = None
+        if feeCost is not None:
+            fee = {
+                'currency': self.safe_currency_code(self.safe_string(trade, 'commissionAsset')),
+                'cost': self.parse_number(feeCost),
+                'rate': None,
+            }
+        return self.safe_trade({
+            'id': self.safe_string(trade, 'tradeId'),
+            'info': trade,
+            'timestamp': timestamp,
+            'datetime': self.iso8601(timestamp),
+            'symbol': self.safe_symbol(marketId, marketResolved),
+            'type': None,
+            'side': side,
+            'order': self.safe_string(trade, 'orderId'),
+            'takerOrMaker': takerOrMaker,
+            'price': self.safe_string(trade, 'price'),
+            'amount': self.safe_string(trade, 'qty'),
+            'cost': self.safe_string(trade, 'quoteQty'),
+            'fee': fee,
+        }, market)
+
+    def v2_order_request(self, id: str, symbol: Str, params: dict) -> list[object]:
+        """
+ @ignore
+        :param str id: order id
+        :param str symbol: unified symbol
+        :param dict params: extra parameters
+        :returns dict[]: request and remaining params
+        """
+        if symbol is None:
+            raise ArgumentsRequired(self.id + ' order endpoints require a symbol argument')
+        market = self.market(symbol)
+        clientOrderId = self.safe_string(params, 'clientOrderId')
+        paramsOmitted = self.omit(params, ['clientOrderId'])
+        request = {
+            'symbol': self.tapi_v2_symbol(market),
+        }
+        if clientOrderId is not None:
+            request['origClientOrderId'] = clientOrderId
+        else:
+            request['orderId'] = self.v2_order_id(id)
+        return [market, request, paramsOmitted]
+
+    def v2_order_id(self, orderId: str) -> str:
+        """
+ @ignore
+        numeric id for GET and DELETE /api/v2/order. fullOrderId stays the unified id
+        :param str orderId: unified id, a number or a fullOrderId such as btcidr-limit-6423
+        :returns str: numeric order id
+        """
+        parts = orderId.split('-')
+        numParts = len(parts)
+        tail = parts[numParts - 1]
+        digits = '0123456789'
+        if len(tail) < 1:
+            return orderId
+        index = 0
+        while(index < len(tail)):
+            character = tail[index]
+            if digits.find(character) < 0:
+                return orderId
+            index = self.sum(index, 1)
+        return tail
+
+    async def open_orders_v2(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+ @ignore
+        :param str [symbol]: unified symbol
+        :param int [since]: earliest timestamp
+        :param int [limit]: max number of orders
+        :param dict [params]: extra parameters
+        :returns dict[]: a list of order structures
+        """
+        if self.markets is None:
+            await self.load_markets()
+        market = None
+        request = {}
+        if symbol is not None:
+            market = self.market(symbol)
+            request['symbol'] = self.tapi_v2_symbol(market)
+        response = await self.v2GetOpenOrders(self.extend(request, params))
+        rows = self.to_array(response)
+        return self.parse_orders(rows, market, since, limit)
+
+    def clamp_v2_limit(self, limit: Int = None) -> Int:
+        """
+ @ignore
+        :param int [limit]: requested limit
+        :returns int: limit clamped to 10-1000
+        """
+        if limit is None:
+            return None
+        if limit < 10:
+            return 10
+        if limit > 1000:
+            return 1000
+        return limit
+
+    async def history_v2(self, historyKind: str, symbol: str, since: Int = None, until: Int = None, limit: Int = None, params: dict = {}) -> list[object]:
+        """
+ @ignore
+        :param str historyKind: orders or trades
+        :param str symbol: unified symbol
+        :param int [since]: earliest timestamp
+        :param int [until]: latest timestamp
+        :param int [limit]: max rows per request
+        :param dict [params]: extra parameters
+        :returns dict[]: raw rows
+        """
+        if self.markets is None:
+            await self.load_markets()
+        market = self.market(symbol)
+        paginate = self.safe_bool(params, 'paginate', False)
+        paramsOmitted = self.omit(params, ['symbol', 'startTime', 'endTime', 'limit', 'paginate'])
+        maxSpan = 7 * 24 * 60 * 60 * 1000
+        windows = self.window_v2(since, until, maxSpan)
+        numWindows = len(windows)
+        if (numWindows > 1) and (paginate is not True):
+            numWindows = 1
+        requestLimit = self.clamp_v2_limit(limit)
+        result = []
+        for i in range(0, numWindows):
+            window = windows[i]
+            request = {
+                'symbol': self.tapi_v2_symbol(market),
+            }
+            if window[0] is not None:
+                request['startTime'] = window[0]
+            if window[1] is not None:
+                request['endTime'] = window[1]
+            if requestLimit is not None:
+                request['limit'] = requestLimit
+            response = None
+            if historyKind == 'orders':
+                response = await self.v2GetOrderHistories(self.extend(request, paramsOmitted))
+            else:
+                response = await self.v2GetMyTrades(self.extend(request, paramsOmitted))
+            rows = self.safe_list(response, 'data', [])
+            for j in range(0, len(rows)):
+                result.append(rows[j])
+        return result
+
+    async def fetch_orders(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Order]:
+        """
+        fetches information on multiple orders made by the user
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#order-history
+
+        :param str symbol: unified market symbol of the market orders were made in
+        :param int [since]: the earliest time in ms to fetch orders for
+        :param int [limit]: the maximum number of order structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param int [params.until]: the latest time in ms to fetch orders for
+        :param boolean [params.paginate]: True to request every 7-day window. When omitted, only the first window from since is requested. v1 orderHistory was decommissioned on 2026-04-07, so self method requires options.tapiVersion "2"
+        :returns Order[]: a list of `order structures <https://docs.ccxt.com/?id=order-structure>`
+        """
+        if not self.is_tapi_v2():
+            raise NotSupported(self.id + ' fetchOrders() requires options.tapiVersion set to "2"')
+        if symbol is None:
+            raise ArgumentsRequired(self.id + ' fetchOrders() requires a symbol argument')
+        until = self.safe_integer(params, 'until')
+        paramsOmitted = self.omit(params, ['until'])
+        rows = await self.history_v2('orders', symbol, since, until, limit, paramsOmitted)
+        market = self.market(symbol)
+        return self.parse_orders(rows, market, since, limit)
+
+    async def fetch_my_trades(self, symbol: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Trade]:
+        """
+        fetch all trades made by the user
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#trade-history
+
+        :param str symbol: unified market symbol
+        :param int [since]: the earliest time in ms to fetch trades for
+        :param int [limit]: the maximum number of trades structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param int [params.until]: the latest time in ms to fetch trades for
+        :param boolean [params.paginate]: True to request every 7-day window. When omitted, only the first window from since is requested. v1 tradeHistory was decommissioned on 2026-04-07, so self method requires options.tapiVersion "2"
+        :returns Trade[]: a list of `trade structures <https://docs.ccxt.com/?id=trade-structure>`
+        """
+        if not self.is_tapi_v2():
+            raise NotSupported(self.id + ' fetchMyTrades() requires options.tapiVersion set to "2"')
+        if symbol is None:
+            raise ArgumentsRequired(self.id + ' fetchMyTrades() requires a symbol argument')
+        until = self.safe_integer(params, 'until')
+        paramsOmitted = self.omit(params, ['until'])
+        rows = await self.history_v2('trades', symbol, since, until, limit, paramsOmitted)
+        market = self.market(symbol)
+        return self.parse_trades(rows, market, since, limit)
+
+    async def deposit_addresses_v2(self, codes: Strings = None, params: dict = {}) -> list[DepositAddress]:
+        """
+ @ignore
+        :param str[] codes: unified currency codes, required because each TAPI v2 query needs a coin
+        :param dict [params]: extra parameters
+        :returns dict[]: a list of address structures
+        """
+        if codes is None:
+            raise ArgumentsRequired(self.id + ' fetchDepositAddresses() requires symbols like BTC')
+        numCodes = len(codes)
+        if numCodes < 1:
+            raise ArgumentsRequired(self.id + ' fetchDepositAddresses() requires symbols like BTC')
+        if self.markets is None:
+            await self.load_markets()
+        networkAndParams = self.handle_network_code_and_params(params)
+        networkCode = networkAndParams[0]
+        paramsOmitted = networkAndParams[1]
+        result = []
+        for i in range(0, numCodes):
+            code = codes[i]
+            currency = self.currency(code)
+            coinId = self.safe_string(currency, 'id', code)
+            if (coinId is None) or (coinId == ''):
+                continue
+            request = {
+                'coin': coinId,
+            }
+            if networkCode is not None:
+                request['network'] = self.network_code_to_id(networkCode, code)
+            response = await self.v2GetCapitalDepositAddressList(self.extend(request, paramsOmitted))
+            rows = self.to_array(response)
+            numRows = len(rows)
+            for j in range(0, numRows):
+                row = rows[j]
+                address = self.safe_string(row, 'address')
+                if (address is None) or (address == ''):
+                    continue
+                self.check_address(address)
+                networkId = self.safe_string(row, 'network')
+                currencyCode = self.safe_string(currency, 'code')
+                if currencyCode is not None:
+                    result.append({
+                        'info': row,
+                        'currency': currencyCode,
+                        'network': self.network_id_to_code(networkId, currencyCode),
+                        'address': address,
+                        'tag': self.safe_string(row, 'tag'),
+                    })
+        return result
+
+    def window_v2(self, since: Int, until: Int, maxSpan: float) -> list[object]:
+        """
+ @ignore
+        :param int [since]: earliest timestamp
+        :param int [until]: latest timestamp
+        :param int maxSpan: maximum window in ms
+        :returns int[][]: windows of start and end
+        """
+        windowStart = since
+        windowEnd = until
+        if (windowStart is None) and (windowEnd is None):
+            return [[None, None]]
+        if windowEnd is None:
+            windowEnd = self.milliseconds()
+        if windowStart is None:
+            windowStart = windowEnd - maxSpan
+        windows = []
+        cursor = windowStart
+        while(cursor < windowEnd):
+            chunkEnd = self.sum(cursor, maxSpan)
+            if chunkEnd > windowEnd:
+                chunkEnd = windowEnd
+            windows.append([cursor, chunkEnd])
+            if chunkEnd == cursor:
+                break
+            cursor = chunkEnd
+        return windows
+
+    async def capital_history_v2(self, direction: str, code: Str = None, since: Int = None, until: Int = None, limit: Int = None, params: dict = {}) -> list[object]:
+        """
+ @ignore
+        :param str direction: deposit or withdraw
+        :param str [code]: unified currency code
+        :param int [since]: earliest timestamp
+        :param int [until]: latest timestamp
+        :param int [limit]: max rows
+        :param dict [params]: extra parameters
+        :returns dict[]: raw rows
+        """
+        paginate = self.safe_bool(params, 'paginate', False)
+        paramsOmitted = self.omit(params, ['coin', 'startTime', 'endTime', 'limit', 'paginate'])
+        requestLimit = self.clamp_v2_limit(limit)
+        maxSpan = 90 * 24 * 60 * 60 * 1000
+        windows = self.window_v2(since, until, maxSpan)
+        numWindows = len(windows)
+        if (numWindows > 1) and (paginate is not True):
+            numWindows = 1
+        result = []
+        for i in range(0, numWindows):
+            window = windows[i]
+            request = {}
+            if code is not None:
+                currency = self.currency(code)
+                request['coin'] = currency['id']
+            if window[0] is not None:
+                request['startTime'] = window[0]
+            if window[1] is not None:
+                request['endTime'] = window[1]
+            if requestLimit is not None:
+                request['limit'] = requestLimit
+            response = None
+            if direction == 'deposit':
+                response = await self.v2GetCapitalDepositHisrec(self.extend(request, paramsOmitted))
+            else:
+                response = await self.v2GetCapitalWithdrawHistory(self.extend(request, paramsOmitted))
+            rows = self.to_array(response)
+            for j in range(0, len(rows)):
+                txType = 'deposit' if (direction == 'deposit') else 'withdraw'
+                row = self.extend(rows[j], {
+                    'txType': txType,
+                })
+                result.append(row)
+        return result
+
+    async def fiat_history_v2(self, direction: str, code: Str = None, since: Int = None, until: Int = None, limit: Int = None, params: dict = {}) -> list[object]:
+        """
+ @ignore
+        :param str direction: deposit or withdraw
+        :param str [code]: unified currency code
+        :param int [since]: earliest timestamp
+        :param int [until]: latest timestamp
+        :param int [limit]: max rows
+        :param dict [params]: extra parameters
+        :returns dict[]: raw rows
+        """
+        if (code is not None) and (code != 'IDR'):
+            return []
+        paginate = self.safe_bool(params, 'paginate', False)
+        paramsOmitted = self.omit(params, ['transactionType', 'beginTime', 'endTime', 'limit', 'paginate'])
+        requestLimit = self.clamp_v2_limit(limit)
+        maxSpan = 30 * 24 * 60 * 60 * 1000
+        windows = self.window_v2(since, until, maxSpan)
+        numWindows = len(windows)
+        if (numWindows > 1) and (paginate is not True):
+            numWindows = 1
+        result = []
+        for i in range(0, numWindows):
+            window = windows[i]
+            request = {}
+            if direction == 'deposit':
+                request['transactionType'] = '0'
+            if window[0] is not None:
+                request['beginTime'] = window[0]
+            if window[1] is not None:
+                request['endTime'] = window[1]
+            if requestLimit is not None:
+                request['limit'] = requestLimit
+            response = await self.v2GetFiatOrders(self.extend(request, paramsOmitted))
+            rows = self.safe_list(response, 'data', [])
+            for j in range(0, len(rows)):
+                txType = 'deposit' if (direction == 'deposit') else 'withdraw'
+                row = self.extend(rows[j], {
+                    'txType': txType,
+                })
+                result.append(row)
+        return result
+
+    async def fetch_deposits(self, code: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Transaction]:
+        """
+        fetch all deposits made to an account
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-deposit-coin-information-history
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
+
+        :param str [code]: unified currency code. Omitting code returns only BTC crypto deposits plus IDR fiat deposits, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
+        :param int [since]: the earliest time in ms to fetch deposits for
+        :param int [limit]: the maximum number of deposits structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param int [params.until]: the latest time in ms to fetch deposits for
+        :param boolean [params.paginate]: True to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
+        :returns dict[]: a list of `transaction structures <https://docs.ccxt.com/?id=transaction-structure>`
+        """
+        if not self.is_tapi_v2():
+            raise NotSupported(self.id + ' fetchDeposits() requires options.tapiVersion set to "2"')
+        if self.markets is None:
+            await self.load_markets()
+        until = self.safe_integer(params, 'until')
+        paramsOmitted = self.omit(params, ['until'])
+        rows = []
+        if code != 'IDR':
+            cryptoRows = await self.capital_history_v2('deposit', code, since, until, limit, paramsOmitted)
+            rows = self.array_concat(rows, cryptoRows)
+        if (code is None) or (code == 'IDR'):
+            fiatRows = await self.fiat_history_v2('deposit', code, since, until, limit, paramsOmitted)
+            rows = self.array_concat(rows, fiatRows)
+        currency = None if (code is None) else self.currency(code)
+        return self.parse_transactions(rows, currency, since, limit)
+
+    async def fetch_withdrawals(self, code: Str = None, since: Int = None, limit: Int = None, params: dict = {}) -> list[Transaction]:
+        """
+        fetch all withdrawals made from an account
+
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdraw-coin-information-history
+        https://github.com/btcid/indodax-official-api-docs/blob/master/INDODAX-TradeAPI-2.md#get-withdrawdeposit-fiat-information-history
+
+        :param str [code]: unified currency code. Omitting code returns only BTC crypto withdrawals plus IDR fiat withdrawals, because TAPI v2 defaults coin to BTC. Without params.paginate the crypto window is 90 days and the IDR window is the first 30 days, so paging by the newest row can skip IDR. Not available when options.tapiVersion is "1"
+        :param int [since]: the earliest time in ms to fetch withdrawals for
+        :param int [limit]: the maximum number of withdrawals structures to retrieve
+        :param dict [params]: extra parameters specific to the exchange API endpoint
+        :param int [params.until]: the latest time in ms to fetch withdrawals for
+        :param boolean [params.paginate]: True to request every exchange window. When omitted, only the first window from since is requested. Crypto windows are 90 days and IDR windows are 30 days
+        :returns dict[]: a list of `transaction structures <https://docs.ccxt.com/?id=transaction-structure>`
+        """
+        if not self.is_tapi_v2():
+            raise NotSupported(self.id + ' fetchWithdrawals() requires options.tapiVersion set to "2"')
+        if self.markets is None:
+            await self.load_markets()
+        until = self.safe_integer(params, 'until')
+        paramsOmitted = self.omit(params, ['until'])
+        rows = []
+        if code != 'IDR':
+            cryptoRows = await self.capital_history_v2('withdraw', code, since, until, limit, paramsOmitted)
+            rows = self.array_concat(rows, cryptoRows)
+        if (code is None) or (code == 'IDR'):
+            fiatRows = await self.fiat_history_v2('withdraw', code, since, until, limit, paramsOmitted)
+            rows = self.array_concat(rows, fiatRows)
+        currency = None if (code is None) else self.currency(code)
+        return self.parse_transactions(rows, currency, since, limit)
+
+    def parse_v2_transaction(self, transaction: dict, currency: Currency = None) -> Transaction:
+        """
+ @ignore
+        :param dict transaction: raw transaction
+        :param dict [currency]: currency structure
+        :returns dict: a transaction structure
+        """
+        txKind = self.safe_string(transaction, 'txType')
+        coin = self.safe_string(transaction, 'coin')
+        fiatCurrency = self.safe_string(transaction, 'fiatCurrency')
+        currencyId = coin if (coin is not None) else fiatCurrency
+        code = self.safe_currency_code(currencyId, currency)
+        status = self.safe_string_n(transaction, ['withdrawStatus', 'depositStatus', 'status'])
+        timestamp = self.safe_integer_2(transaction, 'createTime', 'updateTime')
+        if timestamp is None:
+            timestamp = self.safe_integer_n(transaction, ['applyTime', 'insertTime', 'completeTime'])
+        if timestamp is None:
+            timestamp = self.parse8601(self.safe_string_n(transaction, ['applyTime', 'insertTime', 'completeTime']))
+        updated = self.safe_integer_2(transaction, 'updateTime', 'completeTime')
+        if updated is None:
+            updated = self.parse8601(self.safe_string(transaction, 'completeTime'))
+        info = self.omit(transaction, ['txType'])
+        feeCost = self.safe_number_2(transaction, 'transactionFee', 'totalFee')
+        fee = None
+        if feeCost is not None:
+            fee = {
+                'currency': code,
+                'cost': feeCost,
+                'rate': None,
+            }
+        networkId = self.safe_string(transaction, 'network')
+        return {
+            'id': self.safe_string_2(transaction, 'id', 'orderNo'),
+            'txid': self.safe_string(transaction, 'txId'),
+            'timestamp': timestamp,
+            'datetime': self.iso8601(timestamp),
+            'network': self.network_id_to_code(networkId, code),
+            'addressFrom': None,
+            'address': self.safe_string(transaction, 'address'),
+            'addressTo': None,
+            'amount': self.safe_number(transaction, 'amount'),
+            'type': None if (txKind is None) else txKind,
+            'currency': code,
+            'status': self.parse_transaction_status(status),
+            'updated': updated,
+            'tagFrom': None,
+            'tag': self.safe_string(transaction, 'addressTag'),
+            'tagTo': None,
+            'comment': None,
+            'internal': None,
+            'fee': fee,
+            'info': info,
+        }
+
+    async def send_withdraw_v2(self, code: str, amount: float, address: str, tag: Str = None, params: dict = {}) -> Transaction:
+        """
+ @ignore
+        :param str code: unified currency code
+        :param float amount: amount to withdraw
+        :param str address: destination address or bank account number
+        :param str [tag]: destination tag or memo, sent as addressTag
+        :param dict [params]: extra parameters
+        :returns dict: a transaction structure
+        """
+        withdrawTag = self.handle_withdraw_tag_and_params(tag, params)
+        tagValue = withdrawTag[0]
+        paramsAfterTag = withdrawTag[1]
+        if self.markets is None:
+            await self.load_markets()
+        currency = self.currency(code)
+        if currency['code'] == 'IDR':
+            bankCode = self.safe_string(paramsAfterTag, 'bankCode')
+            if (bankCode is None) or (bankCode == ''):
+                raise ArgumentsRequired(self.id + ' withdraw() requires a params.bankCode for IDR, the 3-digit bank code')
+            clientRequestId = self.safe_string(paramsAfterTag, 'clientOrderId', str(self.milliseconds()))
+            paramsOmitted = self.omit(paramsAfterTag, ['bankCode', 'clientOrderId'])
+            accountInfo = {
+                'accountNumber': address,
+                'bankCodeForPix': bankCode,
+            }
+            fiatRequest = {
+                'apiPaymentMethod': 'bank_transfer',
+                'currency': 'idr',
+                'amount': self.parse_to_int(amount),
+                'accountInfo': self.json(self.keysort(accountInfo)),
+                'clientRequestId': clientRequestId,
+            }
+            fiatResponse = await self.v2PostFiatWithdraw(self.extend(fiatRequest, paramsOmitted))
+            data = self.safe_dict(fiatResponse, 'data', {})
+            orderId = self.safe_string(data, 'orderId')
+            return self.parse_v2_transaction({
+                'orderNo': orderId,
+                'fiatCurrency': 'IDR',
+                'amount': self.number_to_string(amount),
+                'txType': 'withdraw',
+                'address': address,
+            }, currency)
+        self.check_address(address)
+        networkAndParams = self.handle_network_code_and_params(paramsAfterTag)
+        networkCode = networkAndParams[0]
+        paramsAfterNetwork = networkAndParams[1]
+        withdrawOrderId = self.safe_string(paramsAfterNetwork, 'clientOrderId', str(self.milliseconds()))
+        paramsForWithdraw = self.omit(paramsAfterNetwork, ['clientOrderId'])
+        request = {
+            'coin': currency['id'],
+            'address': address,
+            'amount': self.number_to_string(amount),
+            'withdrawOrderId': withdrawOrderId,
+        }
+        if networkCode is not None:
+            request['network'] = self.network_code_to_id(networkCode, currency['code'])
+        if (tagValue is not None) and (tagValue != ''):
+            request['addressTag'] = tagValue
+        response = await self.v2PostCapitalWithdrawApply(self.extend(request, paramsForWithdraw))
+        annotated = self.extend(response, {
+            'txType': 'withdraw',
+        })
+        return self.parse_v2_transaction(annotated, currency)
 
     def sign(self, path: str, api='public', method='GET', params: dict = {}, headers: dict = None, body: Str = None) -> dict:
         apiUrl = self.safe_string(self.urls['api'], api)
         if apiUrl is None:
             raise ExchangeError(self.id + ' sign() has no API URL for self endpoint')
         url = apiUrl
-        privateBody = None
-        privateHeaders = None
-        isPublic = (api == 'public')
-        if isPublic:
+        requestBody = body
+        requestHeaders = headers
+        if api == 'public':
             query = self.omit(params, self.extract_params(path))
             requestPath = '/' + self.implode_params(path, params)
-            url += requestPath
+            url = url + requestPath
             if len(query) > 0:
                 url += '?' + self.urlencode_with_array_repeat(query)
+        elif api == 'v2':
+            self.check_required_credentials()
+            sandboxUrl = self.safe_string(self.options, 'sandboxUrl')
+            if (sandboxUrl is not None) and (sandboxUrl != ''):
+                url = sandboxUrl
+            url = url + '/api/v2/' + self.implode_params(path, params)
+            query = self.urlencode(self.extend({
+                'timestamp': self.request_timestamp(),
+                'recvWindow': self.safe_integer(self.options, 'recvWindow', 5000),
+            }, params))
+            signature = self.hmac(self.encode(query), self.encode(self.secret), hashlib.sha256)
+            requestHeaders = {
+                'Accept': 'application/json',
+                'X-APIKEY': self.apiKey,
+                'Sign': signature,
+            }
+            if method == 'POST':
+                requestBody = query
+                requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded'
+            else:
+                url += '?' + query
+        elif api == 'deadman':
+            self.check_required_credentials()
+            deadmanUrl = self.safe_string(self.options, 'deadmanUrl')
+            if (deadmanUrl is not None) and (deadmanUrl != ''):
+                url = deadmanUrl
+            url = url + '/' + self.implode_params(path, params)
+            query = self.urlencode(self.extend({
+                'timestamp': self.request_timestamp(),
+                'recvWindow': self.safe_integer(self.options, 'recvWindow', 5000),
+            }, params))
+            requestBody = query
+            if self.is_tapi_v2():
+                requestHeaders = {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-APIKEY': self.apiKey,
+                    'Sign': self.hmac(self.encode(query), self.encode(self.secret), hashlib.sha256),
+                }
+            else:
+                requestHeaders = {
+                    'Content-Type': 'text/plain',
+                    'Key': self.apiKey,
+                    'Sign': self.hmac(self.encode(query), self.encode(self.secret), hashlib.sha512),
+                }
         else:
             self.check_required_credentials()
-            privateBody = self.urlencode(self.extend({
+            requestBody = self.urlencode(self.extend({
                 'method': path,
-                'timestamp': self.nonce(),
-                'recvWindow': self.options['recvWindow'],
+                'timestamp': self.request_timestamp(),
+                'recvWindow': self.safe_integer(self.options, 'recvWindow', 5000),
             }, params))
-            privateHeaders = {
+            requestHeaders = {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Key': self.apiKey,
-                'Sign': self.hmac(self.encode(privateBody), self.encode(self.secret), hashlib.sha512),
+                'Sign': self.hmac(self.encode(requestBody), self.encode(self.secret), hashlib.sha512),
             }
-        requestBody = privateBody
-        if isPublic:
-            requestBody = body
-        requestHeaders = privateHeaders
-        if isPublic:
-            requestHeaders = headers
         return {'url': url, 'method': method, 'body': requestBody, 'headers': requestHeaders}
+
+    async def request(self, path: object, api='public', method='GET', params: dict = {}, headers: object = None, body: object = None, config: object = {}) -> object:
+        """
+ @ignore
+        send a request and retry once when the exchange rejects the timestamp
+        :param str path: endpoint path
+        :param str [api]: api section, public, private, deadman, or v2
+        :param str [method]: http method
+        :param dict [params]: request parameters
+        :param dict [headers]: request headers
+        :param str [body]: request body
+        :param dict [config]: request config
+        :returns dict: the exchange response
+        """
+        response = None
+        try:
+            response = await self.fetch2(path, api, method, params, headers, body, config)
+        except Exception as e:
+            adjusted = self.safe_bool(self.options, 'timestampAdjusted', False)
+            if (api == 'public') or adjusted or not (isinstance(e, InvalidNonce)):
+                raise e
+            await self.load_time_difference()
+            self.options['timestampAdjusted'] = True
+            response = await self.fetch2(path, api, method, params, headers, body, config)
+        return response
 
     def handle_errors(self, code: int, reason: str, url: str, method: str, headers: dict, body: str, response: object, requestHeaders: object, requestBody: object):
         if response is None:
@@ -1482,6 +2756,14 @@ class indodax(Exchange, ImplicitAPI):
         # {"success":"1","status":"approved","withdraw_currency":"strm","withdraw_address":"0x2b9A8cd5535D99b419aEfFBF1ae8D90a7eBdb24E","withdraw_amount":"2165.05767839","fee":"21.11000000","amount_after_fee":"2143.94767839","submit_time":"1730759489","withdraw_id":"strm-3423","txid":""}
         if isinstance(response, list):
             return None  # public endpoints may return []-arrays
+        errorCode = self.safe_integer(response, 'code')
+        if (errorCode is not None) and (errorCode != 0):
+            message = self.safe_string(response, 'msg', '')
+            errorFeedback = self.id + ' ' + body
+            self.throw_broadly_matched_exception(self.exceptions['broad'], message, errorFeedback)
+            codeString = self.number_to_string(errorCode)
+            self.throw_exactly_matched_exception(self.exceptions['exact'], codeString, errorFeedback)
+            raise ExchangeError(errorFeedback)
         error = self.safe_string(response, 'error', '')
         if not ('success' in response) and error == '':
             return None  # no 'success' property on public responses
@@ -1490,11 +2772,17 @@ class indodax(Exchange, ImplicitAPI):
             return None
         if self.safe_integer(response, 'success', 0) == 1:
             # { success: 1, return: { orders: [] }}
+            # countdownCancelAll answers { success: 1 } with no return field
             if not ('return' in response):
+                if url.find('countdownCancelAll') >= 0:
+                    return None
                 raise ExchangeError(self.id + ': malformed response: ' + self.json(response))
             else:
                 return None
         feedback = self.id + ' ' + body
+        errorCodeText = self.safe_string(response, 'error_code')
+        if errorCodeText is not None:
+            self.throw_exactly_matched_exception(self.exceptions['exact'], errorCodeText, feedback)
         self.throw_exactly_matched_exception(self.exceptions['exact'], error, feedback)
         self.throw_broadly_matched_exception(self.exceptions['broad'], error, feedback)
         raise ExchangeError(feedback)  # unknown message
