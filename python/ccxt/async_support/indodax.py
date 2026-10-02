@@ -2695,19 +2695,11 @@ class indodax(Exchange, ImplicitAPI):
                 'recvWindow': self.safe_integer(self.options, 'recvWindow', 5000),
             }, params))
             requestBody = query
-            if self.is_tapi_v2():
-                requestHeaders = {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-APIKEY': self.apiKey,
-                    'Sign': self.hmac(self.encode(query), self.encode(self.secret), hashlib.sha256),
-                }
-            else:
-                requestHeaders = {
-                    'Content-Type': 'text/plain',
-                    'Key': self.apiKey,
-                    'Sign': self.hmac(self.encode(query), self.encode(self.secret), hashlib.sha512),
-                }
+            requestHeaders = {
+                'Content-Type': 'text/plain',
+                'Key': self.apiKey,
+                'Sign': self.hmac(self.encode(query), self.encode(self.secret), hashlib.sha512),
+            }
         else:
             self.check_required_credentials()
             requestBody = self.urlencode(self.extend({

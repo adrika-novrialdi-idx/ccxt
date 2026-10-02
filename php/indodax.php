@@ -2937,20 +2937,11 @@ class indodax extends Exchange {
                 'recvWindow' => $this->safe_integer($this->options, 'recvWindow', 5000),
             ), $params));
             $requestBody = $query;
-            if ($this->is_tapi_v2()) {
-                $requestHeaders = array(
-                    'Accept' => 'application/json',
-                    'Content-Type' => 'application/x-www-form-urlencoded',
-                    'X-APIKEY' => $this->apiKey,
-                    'Sign' => $this->hmac($this->encode($query), $this->encode($this->secret), 'sha256'),
-                );
-            } else {
-                $requestHeaders = array(
-                    'Content-Type' => 'text/plain',
-                    'Key' => $this->apiKey,
-                    'Sign' => $this->hmac($this->encode($query), $this->encode($this->secret), 'sha512'),
-                );
-            }
+            $requestHeaders = array(
+                'Content-Type' => 'text/plain',
+                'Key' => $this->apiKey,
+                'Sign' => $this->hmac($this->encode($query), $this->encode($this->secret), 'sha512'),
+            );
         } else {
             $this->check_required_credentials();
             $requestBody = $this->urlencode($this->extend(array(

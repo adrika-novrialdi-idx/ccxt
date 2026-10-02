@@ -2103,7 +2103,7 @@ func (this *Indodax) cancelOrderBody(ch chan AsyncResult[map[string]any], id any
 /**
  * @method
  * @name indodax#cancelAllOrdersAfter
- * @description dead man's switch, cancel all orders after the given timeout. options.deadmanUrl replaces the tapi base and has no trailing path
+ * @description dead man's switch, cancel all orders after a countdown in milliseconds, and 0 stops the timer. options.deadmanUrl replaces the tapi base and has no trailing path
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Deadman-switch.md
  * @param {number} timeout time in milliseconds, 0 represents cancel the timer
  * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -4060,19 +4060,10 @@ func (this *Indodax) Sign(path string, optionalArgs ...any) any {
 			"recvWindow": this.SafeInteger(this.Options, "recvWindow", 5000),
 		}, params))
 		requestBody = query
-		if this.IsTapiV2() {
-			requestHeaders = map[string]any{
-				"Accept":       "application/json",
-				"Content-Type": "application/x-www-form-urlencoded",
-				"X-APIKEY":     this.ApiKey,
-				"Sign":         this.Hmac(this.Encode(query), this.Encode(this.Secret), sha256),
-			}
-		} else {
-			requestHeaders = map[string]any{
-				"Content-Type": "text/plain",
-				"Key":          this.ApiKey,
-				"Sign":         this.Hmac(this.Encode(query), this.Encode(this.Secret), sha512),
-			}
+		requestHeaders = map[string]any{
+			"Content-Type": "text/plain",
+			"Key":          this.ApiKey,
+			"Sign":         this.Hmac(this.Encode(query), this.Encode(this.Secret), sha512),
 		}
 	} else {
 		this.CheckRequiredCredentials()
@@ -4635,7 +4626,7 @@ func (this *Indodax) CancelOrder(id string, options ...CancelOrderOptions) (Orde
 /**
  * @method
  * @name indodax#cancelAllOrdersAfter
- * @description dead man's switch, cancel all orders after the given timeout. options.deadmanUrl replaces the tapi base and has no trailing path
+ * @description dead man's switch, cancel all orders after a countdown in milliseconds, and 0 stops the timer. options.deadmanUrl replaces the tapi base and has no trailing path
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Deadman-switch.md
  * @param {number} timeout time in milliseconds, 0 represents cancel the timer
  * @param {object} [params] extra parameters specific to the exchange API endpoint

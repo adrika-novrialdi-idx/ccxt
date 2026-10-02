@@ -1528,7 +1528,7 @@ public partial class indodax : Exchange
         parameters ??= new Dictionary<string, object>();
         if (this.isTapiV2())
         {
-            object closedOrders = ccxt.BaseExchange.FromOrderList(await this.FetchOrders(symbol,ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
+            List<object> closedOrders = ccxt.BaseExchange.FromOrderList(await this.FetchOrders(symbol,ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
             return ccxt.BaseExchange.ToOrderList(this.filterBy(closedOrders, "status", "closed"));
         }
         if ((symbol == null))
@@ -1782,7 +1782,7 @@ public partial class indodax : Exchange
     /**
      * @method
      * @name indodax#cancelAllOrdersAfter
-     * @description dead man's switch, cancel all orders after the given timeout. options.deadmanUrl replaces the tapi base and has no trailing path
+     * @description dead man's switch, cancel all orders after a countdown in milliseconds, and 0 stops the timer. options.deadmanUrl replaces the tapi base and has no trailing path
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Deadman-switch.md
      * @param {number} timeout time in milliseconds, 0 represents cancel the timer
      * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -1939,8 +1939,8 @@ public partial class indodax : Exchange
         parameters ??= new Dictionary<string, object>();
         if (this.isTapiV2())
         {
-            object deposits = ccxt.BaseExchange.FromTransactionList(await this.FetchDeposits(code,ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
-            object withdrawals = ccxt.BaseExchange.FromTransactionList(await this.FetchWithdrawals(code,ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
+            List<object> deposits = ccxt.BaseExchange.FromTransactionList(await this.FetchDeposits(code,ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
+            List<object> withdrawals = ccxt.BaseExchange.FromTransactionList(await this.FetchWithdrawals(code,ccxt.BaseExchange.ToInt64Arg(since),ccxt.BaseExchange.ToInt64Arg(limit), parameters));
             List<object> merged = this.arrayConcat(deposits, withdrawals);
             return ccxt.BaseExchange.ToTransactionList(this.filterBySinceLimit(merged, since, limit, "timestamp"));
         }
@@ -2275,7 +2275,7 @@ public partial class indodax : Exchange
     public async override Task<ccxt.DepositAddress> FetchDepositAddress(string code, object parameters = null)
     {
         parameters ??= new Dictionary<string, object>();
-        object addresses = ccxt.BaseExchange.FromDepositAddressList(await this.FetchDepositAddresses(new List<object>() {code}, parameters));
+        List<object> addresses = ccxt.BaseExchange.FromDepositAddressList(await this.FetchDepositAddresses(new List<object>() {code}, parameters));
         IList<object> rows = this.toArray(addresses);
         for (int i = 0; i < (rows?.Count ?? 0); i++)
         {
@@ -3349,22 +3349,11 @@ public partial class indodax : Exchange
                 { "recvWindow", this.safeInteger(this.options, "recvWindow", 5000) },
             }, parameters));
             requestBody = query;
-            if (this.isTapiV2())
-            {
-                requestHeaders = new Dictionary<string, object>() {
-                    { "Accept", "application/json" },
-                    { "Content-Type", "application/x-www-form-urlencoded" },
-                    { "X-APIKEY", this.apiKey },
-                    { "Sign", this.hmac(this.encode(query), this.encode(this.secret), sha256) },
-                };
-            } else
-            {
-                requestHeaders = new Dictionary<string, object>() {
-                    { "Content-Type", "text/plain" },
-                    { "Key", this.apiKey },
-                    { "Sign", this.hmac(this.encode(query), this.encode(this.secret), sha512) },
-                };
-            }
+            requestHeaders = new Dictionary<string, object>() {
+                { "Content-Type", "text/plain" },
+                { "Key", this.apiKey },
+                { "Sign", this.hmac(this.encode(query), this.encode(this.secret), sha512) },
+            };
         } else
         {
             this.checkRequiredCredentials();

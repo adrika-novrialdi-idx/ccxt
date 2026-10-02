@@ -2200,7 +2200,7 @@ impl IndodaxCore {
 /*
  * @method
  * @name indodax#cancelAllOrdersAfter
- * @description dead man's switch, cancel all orders after the given timeout. options.deadmanUrl replaces the tapi base and has no trailing path
+ * @description dead man's switch, cancel all orders after a countdown in milliseconds, and 0 stops the timer. options.deadmanUrl replaces the tapi base and has no trailing path
  * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Deadman-switch.md
  * @param {number} timeout time in milliseconds, 0 represents cancel the timer
  * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -3943,24 +3943,13 @@ impl IndodaxCore {
             }), &[params.clone()]);
             let mut query: Value = self.urlencode(__ws_arg_32, &[]);
             requestBody = query.clone();
-            if self.is_tapi_v2().as_bool() == Some(true) {
-                requestHeaders = Value::Map({
-                    let mut m = indexmap::IndexMap::new();
-                        m.insert("Accept".to_string(), Value::Str("application/json".into()));
-                        m.insert("Content-Type".to_string(), Value::Str("application/x-www-form-urlencoded".into()));
-                        m.insert("X-APIKEY".to_string(), self.apiKey.clone());
-                        m.insert("Sign".to_string(), self.hmac(self.encode(query.clone()), self.encode(self.secret.clone()), Value::Str("sha256".into()), &[]));
-                    m
-                });
-            }  else {
-                requestHeaders = Value::Map({
-                    let mut m = indexmap::IndexMap::new();
-                        m.insert("Content-Type".to_string(), Value::Str("text/plain".into()));
-                        m.insert("Key".to_string(), self.apiKey.clone());
-                        m.insert("Sign".to_string(), self.hmac(self.encode(query), self.encode(self.secret.clone()), Value::Str("sha512".into()), &[]));
-                    m
-                });
-            }
+            requestHeaders = Value::Map({
+                let mut m = indexmap::IndexMap::new();
+                    m.insert("Content-Type".to_string(), Value::Str("text/plain".into()));
+                    m.insert("Key".to_string(), self.apiKey.clone());
+                    m.insert("Sign".to_string(), self.hmac(self.encode(query), self.encode(self.secret.clone()), Value::Str("sha512".into()), &[]));
+                m
+            });
         }  else {
             self.check_required_credentials(&[]);
             let __ws_arg_33 = self.extend(Value::Map({

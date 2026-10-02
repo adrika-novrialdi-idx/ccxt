@@ -1877,7 +1877,7 @@ public class Indodax extends IndodaxApi
     /**
      * @method
      * @name indodax#cancelAllOrdersAfter
-     * @description dead man's switch, cancel all orders after the given timeout. options.deadmanUrl replaces the tapi base and has no trailing path
+     * @description dead man's switch, cancel all orders after a countdown in milliseconds, and 0 stops the timer. options.deadmanUrl replaces the tapi base and has no trailing path
      * @see https://github.com/btcid/indodax-official-api-docs/blob/master/Deadman-switch.md
      * @param {number} timeout time in milliseconds, 0 represents cancel the timer
      * @param {object} [params] extra parameters specific to the exchange API endpoint
@@ -3520,22 +3520,11 @@ public class Indodax extends IndodaxApi
                 put( "recvWindow", Indodax.this.safeInteger(Indodax.this.options, "recvWindow", 5000) );
             }}, parameters));
             requestBody = query;
-            if (this.isTapiV2())
-            {
-                requestHeaders = new HashMap<String, Object>() {{
-                    put( "Accept", "application/json" );
-                    put( "Content-Type", "application/x-www-form-urlencoded" );
-                    put( "X-APIKEY", Indodax.this.apiKey );
-                    put( "Sign", Indodax.this.hmac(Indodax.this.encode(query), Indodax.this.encode(Indodax.this.secret), sha256()) );
-                }};
-            } else
-            {
-                requestHeaders = new HashMap<String, Object>() {{
-                    put( "Content-Type", "text/plain" );
-                    put( "Key", Indodax.this.apiKey );
-                    put( "Sign", Indodax.this.hmac(Indodax.this.encode(query), Indodax.this.encode(Indodax.this.secret), sha512()) );
-                }};
-            }
+            requestHeaders = new HashMap<String, Object>() {{
+                put( "Content-Type", "text/plain" );
+                put( "Key", Indodax.this.apiKey );
+                put( "Sign", Indodax.this.hmac(Indodax.this.encode(query), Indodax.this.encode(Indodax.this.secret), sha512()) );
+            }};
         } else
         {
             this.checkRequiredCredentials(true);
