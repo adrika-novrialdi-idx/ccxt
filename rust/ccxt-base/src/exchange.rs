@@ -1743,6 +1743,9 @@ pub trait ExchangeRuntime: crate::exchange_generated::ExchangeBase {
     fn super_set_markets(&mut self, markets: Value, currencies: Value) -> Value {
         <Self as crate::exchange_generated::ExchangeBase>::set_markets(self, markets, &[currencies])
     }
+    fn super_after_construct(&mut self) {
+        <Self as crate::exchange_generated::ExchangeBase>::after_construct(self);
+    }
     fn super_network_id_to_code(&self, optional_args: &[Value]) -> Value {
         <Self as crate::exchange_generated::ExchangeBase>::network_id_to_code(self, optional_args)
     }
