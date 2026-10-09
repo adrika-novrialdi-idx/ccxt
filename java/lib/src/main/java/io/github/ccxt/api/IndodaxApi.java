@@ -286,4 +286,158 @@ public class IndodaxApi extends Exchange
         return this.callAsync ("privatePostCreateVoucher", optionalArgs);
     }
 
+    /**
+     * Calls the deadmanPostCountdownCancelAll endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  deadmanPostCountdownCancelAll (Object... optionalArgs)
+    {
+        return this.callAsync ("deadmanPostCountdownCancelAll", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetOrder endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2GetOrder (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetOrder", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetOpenOrders endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON array
+     */
+    public CompletableFuture<List<Object>>  v2GetOpenOrders (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetOpenOrders", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetOrderHistories endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2GetOrderHistories (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetOrderHistories", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetMyTrades endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2GetMyTrades (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetMyTrades", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetAccount endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2GetAccount (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetAccount", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetCapitalWithdrawHistory endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON array
+     */
+    public CompletableFuture<List<Object>>  v2GetCapitalWithdrawHistory (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetCapitalWithdrawHistory", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetCapitalDepositHisrec endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON array
+     */
+    public CompletableFuture<List<Object>>  v2GetCapitalDepositHisrec (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetCapitalDepositHisrec", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetCapitalDepositAddressList endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON array
+     */
+    public CompletableFuture<List<Object>>  v2GetCapitalDepositAddressList (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetCapitalDepositAddressList", optionalArgs);
+    }
+
+    /**
+     * Calls the v2GetFiatOrders endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2GetFiatOrders (Object... optionalArgs)
+    {
+        return this.callAsync ("v2GetFiatOrders", optionalArgs);
+    }
+
+    /**
+     * Calls the v2PostOrder endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2PostOrder (Object... optionalArgs)
+    {
+        return this.callAsync ("v2PostOrder", optionalArgs);
+    }
+
+    /**
+     * Calls the v2PostCapitalWithdrawApply endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2PostCapitalWithdrawApply (Object... optionalArgs)
+    {
+        return this.callAsync ("v2PostCapitalWithdrawApply", optionalArgs);
+    }
+
+    /**
+     * Calls the v2PostFiatWithdraw endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2PostFiatWithdraw (Object... optionalArgs)
+    {
+        return this.callAsync ("v2PostFiatWithdraw", optionalArgs);
+    }
+
+    /**
+     * Calls the v2DeleteOrder endpoint.
+     *
+     * @param optionalArgs the request parameters
+     * @return a JSON object
+     */
+    public CompletableFuture<Map<String, Object>>  v2DeleteOrder (Object... optionalArgs)
+    {
+        return this.callAsync ("v2DeleteOrder", optionalArgs);
+    }
+
 }

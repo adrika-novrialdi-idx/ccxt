@@ -154,6 +154,90 @@ abstract class indodax extends \ccxt\async\Exchange {
     /**
      * @return \React\Promise\PromiseInterface<array<string, mixed>>
      */
+    public function deadman_post_countdowncancelall($params = array()) {
+        return $this->request('countdownCancelAll', 'deadman', 'POST', $params, null, null, array("cost" => 20));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_get_order($params = array()) {
+        return $this->request('order', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<list<mixed>>
+     */
+    public function v2_get_openorders($params = array()) {
+        return $this->request('openOrders', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_get_order_histories($params = array()) {
+        return $this->request('order/histories', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_get_mytrades($params = array()) {
+        return $this->request('myTrades', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_get_account($params = array()) {
+        return $this->request('account', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<list<mixed>>
+     */
+    public function v2_get_capital_withdraw_history($params = array()) {
+        return $this->request('capital/withdraw/history', 'v2', 'GET', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<list<mixed>>
+     */
+    public function v2_get_capital_deposit_hisrec($params = array()) {
+        return $this->request('capital/deposit/hisrec', 'v2', 'GET', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<list<mixed>>
+     */
+    public function v2_get_capital_deposit_address_list($params = array()) {
+        return $this->request('capital/deposit/address/list', 'v2', 'GET', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_get_fiat_orders($params = array()) {
+        return $this->request('fiat/orders', 'v2', 'GET', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_post_order($params = array()) {
+        return $this->request('order', 'v2', 'POST', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_post_capital_withdraw_apply($params = array()) {
+        return $this->request('capital/withdraw/apply', 'v2', 'POST', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_post_fiat_withdraw($params = array()) {
+        return $this->request('fiat/withdraw', 'v2', 'POST', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2_delete_order($params = array()) {
+        return $this->request('order', 'v2', 'DELETE', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
     public function publicGetApiServerTime($params = array()) {
         return $this->request('api/server_time', 'public', 'GET', $params, null, null, array("cost" => 5));
     }
@@ -294,5 +378,89 @@ abstract class indodax extends \ccxt\async\Exchange {
      */
     public function privatePostCreateVoucher($params = array()) {
         return $this->request('createVoucher', 'private', 'POST', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function deadmanPostCountdownCancelAll($params = array()) {
+        return $this->request('countdownCancelAll', 'deadman', 'POST', $params, null, null, array("cost" => 20));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2GetOrder($params = array()) {
+        return $this->request('order', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<list<mixed>>
+     */
+    public function v2GetOpenOrders($params = array()) {
+        return $this->request('openOrders', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2GetOrderHistories($params = array()) {
+        return $this->request('order/histories', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2GetMyTrades($params = array()) {
+        return $this->request('myTrades', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2GetAccount($params = array()) {
+        return $this->request('account', 'v2', 'GET', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<list<mixed>>
+     */
+    public function v2GetCapitalWithdrawHistory($params = array()) {
+        return $this->request('capital/withdraw/history', 'v2', 'GET', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<list<mixed>>
+     */
+    public function v2GetCapitalDepositHisrec($params = array()) {
+        return $this->request('capital/deposit/hisrec', 'v2', 'GET', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<list<mixed>>
+     */
+    public function v2GetCapitalDepositAddressList($params = array()) {
+        return $this->request('capital/deposit/address/list', 'v2', 'GET', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2GetFiatOrders($params = array()) {
+        return $this->request('fiat/orders', 'v2', 'GET', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2PostOrder($params = array()) {
+        return $this->request('order', 'v2', 'POST', $params, null, null, array("cost" => 4));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2PostCapitalWithdrawApply($params = array()) {
+        return $this->request('capital/withdraw/apply', 'v2', 'POST', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2PostFiatWithdraw($params = array()) {
+        return $this->request('fiat/withdraw', 'v2', 'POST', $params, null, null, array("cost" => 24));
+    }
+    /**
+     * @return \React\Promise\PromiseInterface<array<string, mixed>>
+     */
+    public function v2DeleteOrder($params = array()) {
+        return $this->request('order', 'v2', 'DELETE', $params, null, null, array("cost" => 4));
     }
 }
