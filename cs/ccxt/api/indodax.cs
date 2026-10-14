@@ -179,4 +179,102 @@ public partial class indodax : Exchange
         return await this.callAsync<Dictionary<string, object>> ("privatePostCreateVoucher",parameters);
     }
 
+    /// <summary>Calls the deadmanPostCountdownCancelAll endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> deadmanPostCountdownCancelAll (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("deadmanPostCountdownCancelAll",parameters);
+    }
+
+    /// <summary>Calls the v2GetOrder endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2GetOrder (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2GetOrder",parameters);
+    }
+
+    /// <summary>Calls the v2GetOpenOrders endpoint.</summary>
+    /// <returns>a JSON array</returns>
+    public async Task<List<object>> v2GetOpenOrders (object parameters = null)
+    {
+        return await this.callAsync<List<object>> ("v2GetOpenOrders",parameters);
+    }
+
+    /// <summary>Calls the v2GetOrderHistories endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2GetOrderHistories (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2GetOrderHistories",parameters);
+    }
+
+    /// <summary>Calls the v2GetMyTrades endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2GetMyTrades (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2GetMyTrades",parameters);
+    }
+
+    /// <summary>Calls the v2GetAccount endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2GetAccount (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2GetAccount",parameters);
+    }
+
+    /// <summary>Calls the v2GetCapitalWithdrawHistory endpoint.</summary>
+    /// <returns>a JSON array</returns>
+    public async Task<List<object>> v2GetCapitalWithdrawHistory (object parameters = null)
+    {
+        return await this.callAsync<List<object>> ("v2GetCapitalWithdrawHistory",parameters);
+    }
+
+    /// <summary>Calls the v2GetCapitalDepositHisrec endpoint.</summary>
+    /// <returns>a JSON array</returns>
+    public async Task<List<object>> v2GetCapitalDepositHisrec (object parameters = null)
+    {
+        return await this.callAsync<List<object>> ("v2GetCapitalDepositHisrec",parameters);
+    }
+
+    /// <summary>Calls the v2GetCapitalDepositAddressList endpoint.</summary>
+    /// <returns>a JSON array</returns>
+    public async Task<List<object>> v2GetCapitalDepositAddressList (object parameters = null)
+    {
+        return await this.callAsync<List<object>> ("v2GetCapitalDepositAddressList",parameters);
+    }
+
+    /// <summary>Calls the v2GetFiatOrders endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2GetFiatOrders (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2GetFiatOrders",parameters);
+    }
+
+    /// <summary>Calls the v2PostOrder endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2PostOrder (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2PostOrder",parameters);
+    }
+
+    /// <summary>Calls the v2PostCapitalWithdrawApply endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2PostCapitalWithdrawApply (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2PostCapitalWithdrawApply",parameters);
+    }
+
+    /// <summary>Calls the v2PostFiatWithdraw endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2PostFiatWithdraw (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2PostFiatWithdraw",parameters);
+    }
+
+    /// <summary>Calls the v2DeleteOrder endpoint.</summary>
+    /// <returns>a JSON object</returns>
+    public async Task<Dictionary<string, object>> v2DeleteOrder (object parameters = null)
+    {
+        return await this.callAsync<Dictionary<string, object>> ("v2DeleteOrder",parameters);
+    }
+
 }
