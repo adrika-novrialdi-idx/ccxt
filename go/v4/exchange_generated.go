@@ -5407,7 +5407,7 @@ func (this *BaseExchange) BuildOHLCVC(trades any, optionalArgs ...any) any {
 			continue
 		}
 		var ohlcv_length int = len(ohlcvs)
-		var candle int64 = int64(ohlcv_length) - 1
+		var candle int64 = Subtract(ohlcv_length, 1).(int64)
 		if IsEqual(price, nil) {
 			panic(ArgumentsRequired(this.Id + " buildOHLCVC() requires a price argument"))
 		}
@@ -7493,7 +7493,7 @@ func (this *BaseExchange) IsPostOnly(isMarketOrder any, exchangeSpecificParam an
 	var postOnly bool = (this.SafeBool2(params, "postOnly", "post_only", false) != nil && *this.SafeBool2(params, "postOnly", "post_only", false)) || timeInForcePostOnly || EvalTruthy(exchangeSpecificParam)
 	if postOnly {
 		if ioc || fok {
-			panic(InvalidOrder(this.Id + " postOnly orders cannot have timeInForce equal to " + *timeInForce))
+			panic(InvalidOrder(Add(this.Id+" postOnly orders cannot have timeInForce equal to ", timeInForce)))
 		} else if EvalTruthy(isMarketOrder) {
 			panic(InvalidOrder(this.Id + " market orders cannot be postOnly"))
 		} else {
@@ -7521,7 +7521,7 @@ func (this *BaseExchange) HandlePostOnly(isMarketOrder any, exchangeSpecificPost
 	var postOnly bool = (this.SafeBool(params, "postOnly", false) != nil && *this.SafeBool(params, "postOnly", false)) || po || EvalTruthy(exchangeSpecificPostOnlyOption)
 	if postOnly {
 		if ioc || fok {
-			panic(InvalidOrder(this.Id + " postOnly orders cannot have timeInForce equal to " + *timeInForce))
+			panic(InvalidOrder(Add(this.Id+" postOnly orders cannot have timeInForce equal to ", timeInForce)))
 		} else if EvalTruthy(isMarketOrder) {
 			panic(InvalidOrder(this.Id + " market orders cannot be postOnly"))
 		} else {
@@ -8663,7 +8663,7 @@ func (this *BaseExchange) fetchPaginatedCallCursorBody(ch chan AsyncResult[[]any
 				// guard instead of break: inside a try block go turns break into a panic that ends the whole iteration
 				for j := 0; j < responseLength; j++ {
 					if IsEqual(cursorValue, nil) {
-						var index int64 = (int64(responseLength) - int64(j)) - 1
+						var index any = Subtract(Subtract(responseLength, j), 1)
 						var entry map[string]any = SafeMapTyped(response, index)
 						var info map[string]any = SafeMapTyped(entry, "info")
 						cursorValue = func() any {
@@ -9517,7 +9517,7 @@ func (this *BaseExchange) TimeframeFromMilliseconds(ms any) any {
 		return ""
 	}
 	var second int = 1000
-	var minute int64 = 60 * int64(second)
+	var minute int64 = Multiply(60, second).(int64)
 	var hour int64 = 60 * minute
 	var day int64 = 24 * hour
 	var week int64 = 7 * day
