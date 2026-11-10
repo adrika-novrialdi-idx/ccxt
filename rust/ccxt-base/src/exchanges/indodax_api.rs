@@ -132,4 +132,74 @@ impl IndodaxCore {
         self.call_method(Value::Str("private_post_create_voucher".into()), optional_args).await
     }
 
+    /// Auto-generated wrapper for the `deadmanPostCountdownCancelAll` implicit endpoint.
+    pub async fn deadman_post_countdown_cancel_all(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("deadman_post_countdown_cancel_all".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetOrder` implicit endpoint.
+    pub async fn v2_get_order(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_order".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetOpenOrders` implicit endpoint.
+    pub async fn v2_get_open_orders(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_open_orders".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetOrderHistories` implicit endpoint.
+    pub async fn v2_get_order_histories(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_order_histories".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetMyTrades` implicit endpoint.
+    pub async fn v2_get_my_trades(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_my_trades".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetAccount` implicit endpoint.
+    pub async fn v2_get_account(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_account".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetCapitalWithdrawHistory` implicit endpoint.
+    pub async fn v2_get_capital_withdraw_history(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_capital_withdraw_history".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetCapitalDepositHisrec` implicit endpoint.
+    pub async fn v2_get_capital_deposit_hisrec(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_capital_deposit_hisrec".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetCapitalDepositAddressList` implicit endpoint.
+    pub async fn v2_get_capital_deposit_address_list(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_capital_deposit_address_list".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2GetFiatOrders` implicit endpoint.
+    pub async fn v2_get_fiat_orders(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_get_fiat_orders".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2PostOrder` implicit endpoint.
+    pub async fn v2_post_order(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_post_order".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2PostCapitalWithdrawApply` implicit endpoint.
+    pub async fn v2_post_capital_withdraw_apply(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_post_capital_withdraw_apply".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2PostFiatWithdraw` implicit endpoint.
+    pub async fn v2_post_fiat_withdraw(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_post_fiat_withdraw".into()), optional_args).await
+    }
+
+    /// Auto-generated wrapper for the `v2DeleteOrder` implicit endpoint.
+    pub async fn v2_delete_order(&mut self, optional_args: &[Value]) -> Value {
+        self.call_method(Value::Str("v2_delete_order".into()), optional_args).await
+    }
+
 }

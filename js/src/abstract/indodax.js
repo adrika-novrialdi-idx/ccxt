@@ -79,5 +79,47 @@ class Exchange extends _Exchange {
     privatePostCreateVoucher(params = {}) {
         return this.request('createVoucher', ['private'], 'POST', params, { 'cost': 4 });
     }
+    deadmanPostCountdownCancelAll(params = {}) {
+        return this.request('countdownCancelAll', ['deadman'], 'POST', params, { 'cost': 20 });
+    }
+    v2GetOrder(params = {}) {
+        return this.request('order', ['v2'], 'GET', params, { 'cost': 4 });
+    }
+    v2GetOpenOrders(params = {}) {
+        return this.request('openOrders', ['v2'], 'GET', params, { 'cost': 4 });
+    }
+    v2GetOrderHistories(params = {}) {
+        return this.request('order/histories', ['v2'], 'GET', params, { 'cost': 4 });
+    }
+    v2GetMyTrades(params = {}) {
+        return this.request('myTrades', ['v2'], 'GET', params, { 'cost': 4 });
+    }
+    v2GetAccount(params = {}) {
+        return this.request('account', ['v2'], 'GET', params, { 'cost': 4 });
+    }
+    v2GetCapitalWithdrawHistory(params = {}) {
+        return this.request('capital/withdraw/history', ['v2'], 'GET', params, { 'cost': 24 });
+    }
+    v2GetCapitalDepositHisrec(params = {}) {
+        return this.request('capital/deposit/hisrec', ['v2'], 'GET', params, { 'cost': 24 });
+    }
+    v2GetCapitalDepositAddressList(params = {}) {
+        return this.request('capital/deposit/address/list', ['v2'], 'GET', params, { 'cost': 24 });
+    }
+    v2GetFiatOrders(params = {}) {
+        return this.request('fiat/orders', ['v2'], 'GET', params, { 'cost': 24 });
+    }
+    v2PostOrder(params = {}) {
+        return this.request('order', ['v2'], 'POST', params, { 'cost': 4 });
+    }
+    v2PostCapitalWithdrawApply(params = {}) {
+        return this.request('capital/withdraw/apply', ['v2'], 'POST', params, { 'cost': 24 });
+    }
+    v2PostFiatWithdraw(params = {}) {
+        return this.request('fiat/withdraw', ['v2'], 'POST', params, { 'cost': 24 });
+    }
+    v2DeleteOrder(params = {}) {
+        return this.request('order', ['v2'], 'DELETE', params, { 'cost': 4 });
+    }
 }
 export default Exchange;
