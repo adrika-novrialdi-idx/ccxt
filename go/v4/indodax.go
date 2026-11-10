@@ -4113,6 +4113,8 @@ func (this *Indodax) Sign(path string, optionalArgs ...any) map[string]any {
 		}
 	} else {
 		this.CheckRequiredCredentials()
+		// go: copy into a string so the v1 fallthrough does not return apiUrl as-is
+		url = *apiUrl + ""
 		requestBody = this.Urlencode(this.Extend(map[string]any{
 			"method":     path,
 			"timestamp":  this.RequestTimestamp(),
